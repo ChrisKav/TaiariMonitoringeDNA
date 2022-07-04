@@ -161,3 +161,174 @@ heat_tree(mcdata,
           layout = "davidson-harel", # The primary layout algorithm
           initial_layout = "reingold-tilford") # The layout algorithm that initializes node locations
 
+### Bacteria
+
+#Filter to only bacteria
+bac <- subset_taxa(physeq, superkingdom == "Bacteria")
+#Agglomerate bacteria taxa to family level
+bac_glom <- tax_glom(bac, taxrank="family")
+#remove 'kingdom' rank
+tax_table(bac_glom) <- tax_table(bac_glom)[,c(1,3:8)]
+
+#Plot barplots of relevant taxa ranks
+plot_bar(bac_glom, x="Site", fill="phylum")
+
+plot_bar(subset_taxa(bac_glom, phylum == "Proteobacteria"), x="Site", fill="order", facet_grid = ~class)
+plot_bar(subset_taxa(bac_glom, phylum == "Chloroflexi"), x="Site", fill="class")
+plot_bar(subset_taxa(bac_glom, phylum == "Bacteroidetes"), x="Site", fill="order", facet_grid = ~class)
+plot_bar(subset_taxa(bac_glom, phylum == "Spirochaetes"), x="Site", fill="class")
+plot_bar(subset_taxa(bac_glom, phylum == "Cyanobacteria"), x="Site", fill="class")
+plot_bar(subset_taxa(bac_glom, phylum == "Actinobacteria"), x="Site", fill="class")
+plot_bar(subset_taxa(bac_glom, phylum == "Deinococcus-Thermus"), x="Site", fill="class")
+plot_bar(subset_taxa(bac_glom, phylum == "Firmicutes"), x="Site", fill="class")
+plot_bar(subset_taxa(bac_glom, phylum == "Tenericutes"), x="Site", fill="class")
+plot_bar(subset_taxa(bac_glom, phylum == "Nitrospirae"), x="Site", fill="class")
+plot_bar(subset_taxa(bac_glom, phylum == "Acidobacteria"), x="Site", fill="class")
+plot_bar(subset_taxa(bac_glom, phylum == "Verrucomicrobia"), x="Site", fill="class")
+plot_bar(subset_taxa(bac_glom, phylum == "Chlamydiae"), x="Site", fill="class")
+plot_bar(subset_taxa(bac_glom, phylum == "Lentisphaerae"), x="Site", fill="class")
+plot_bar(subset_taxa(bac_glom, phylum == "Fusobacteria"), x="Site", fill="class")
+plot_bar(subset_taxa(bac_glom, phylum == "Planctomycetes"), x="Site", fill="class")
+plot_bar(subset_taxa(bac_glom, phylum == "Elusimicrobia"), x="Site", fill="class")
+plot_bar(subset_taxa(bac_glom, phylum == "Synergistetes"), x="Site", fill="class")
+plot_bar(subset_taxa(bac_glom, phylum == "Armatimonadetes-Thermus"), x="Site", fill="class")
+
+# Conduct ordination
+
+bac.ord <- ordinate(bac_glom, "NMDS", "bray")
+p1 = plot_ordination(bac_glom, bac.ord, type="taxa", color="phylum", title="Bacterial phyla")
+print(p1)
+
+p2 = plot_ordination(bac_glom, bac.ord, type="samples", color="Site") 
+p2 + geom_polygon(aes(fill=Site)) + geom_point(size=5) + ggtitle("samples")
+
+proteo <- subset_taxa(bac_glom, phylum == "Proteobacteria")
+proteo.ord <- ordinate(proteo, "NMDS", "bray")
+p1 = plot_ordination(proteo, proteo.ord, type="taxa", color="order", title="Proteobacteria order")
+print(p1)
+
+p2 = plot_ordination(proteo, proteo.ord, type="samples", color="Site") 
+p2 + geom_polygon(aes(fill=Site)) + geom_point(size=5) + ggtitle("samples")
+
+bacter <- subset_taxa(bac_glom, phylum == "Bacteroidetes")
+bacter.ord <- ordinate(bacter, "NMDS", "bray")
+p1 = plot_ordination(bacter, bacter.ord, type="taxa", color="order", title="Proteobacteria order")
+print(p1)
+
+p2 = plot_ordination(bacter, bacter.ord, type="samples", color="Site") 
+p2 + geom_polygon(aes(fill=Site)) + geom_point(size=5) + ggtitle("samples")
+
+### Fish
+
+
+#Filter to only fish
+fish <- merge_phyloseq(subset_taxa(physeq, class=="Hyperoartia"), subset_taxa(physeq, class=="Actinopteri"))
+
+#remove 'superkingdom' nad 'kingdom' ranks
+tax_table(fish) <- tax_table(fish)[,c(3:8)]
+
+#Plot barplots of relevant taxa ranks
+plot_bar(fish, x="Site", fill="species", facet_grid = ~order)
+
+plot_bar(subset_taxa(fish, genus == "Galaxias"), x="Site", fill="species")
+
+# Conduct ordination
+fish.0 <- prune_samples(sample_sums(fish) > 0, fish)
+fish.ord <- ordinate(fish.0, "NMDS", "bray")
+p1 = plot_ordination(fish.0, fish.ord, type="taxa", color="species", title="Fish species")
+print(p1)
+p2 = plot_ordination(fish.0, fish.ord, type="samples", color="Site") 
+p2 + geom_polygon(aes(fill=Site)) + geom_point(size=5) + ggtitle("samples")
+
+galax <- subset_taxa(fish, genus == "Galaxias")
+galax.0 <- prune_samples(sample_sums(galax) > 0, galax)
+galax.ord <- ordinate(galax.0, "NMDS", "bray")
+p1 = plot_ordination(galax.0, galax.ord, type="taxa", color="species", title="Galaxias species")
+print(p1)
+p2 = plot_ordination(galax.0, galax.ord, type="samples", color="Site") 
+p2 + geom_polygon(aes(fill=Site)) + geom_point(size=5) + ggtitle("samples")
+
+gobio <- subset_taxa(fish, genus == "Gobiomorphus")
+gobio.0 <- prune_samples(sample_sums(gobio) > 0, gobio)
+gobio.ord <- ordinate(gobio.0, "NMDS", "bray")
+p1 = plot_ordination(gobio.0, gobio.ord, type="taxa", color="species", title="Gobiomorphus species")
+print(p1)
+p2 = plot_ordination(gobio.0, gobio.ord, type="samples", color="Site") 
+p2 + geom_polygon(aes(fill=Site)) + geom_point(size=5) + ggtitle("samples")
+
+### Diatoms
+
+#Filter to only diatoms
+diatom <- subset_taxa(physeq, phylum=="Bacillariophyta")
+
+#remove 'superkingdom' and 'kingdom' ranks
+tax_table(diatom) <- tax_table(diatom)[,c(3:8)]
+
+#Plot barplots of relevant taxa ranks
+plot_bar(diatom, x="Site", fill="order")#, facet_grid = ~order)
+
+# Conduct ordination
+diatom.0 <- prune_samples(sample_sums(diatoms) > 0, diatoms)
+diatom.ord <- ordinate(diatom.0, "NMDS", "bray")
+p1 = plot_ordination(diatom.0, diatom.ord, type="taxa", color="family", title="Diatom family")
+print(p1)
+p2 = plot_ordination(diatom.0, diatom.ord, type="samples", color="Site") 
+p2 + geom_polygon(aes(fill=Site)) + geom_point(size=5) + ggtitle("samples")
+
+#Filter to only ciliates
+ciliate <- subset_taxa(physeq, phylum=="Ciliophora")
+ciliate <- tax_glom(ciliate, taxrank="genus")
+
+#remove 'superkingdom' and 'kingdom' ranks
+tax_table(ciliate) <- tax_table(ciliate)[,c(3:7)]
+
+#Plot barplots of relevant taxa ranks
+plot_bar(ciliate, x="Site", fill="order")#, facet_grid = ~order)
+
+# Conduct ordination
+ciliate.0 <- prune_samples(sample_sums(ciliate) > 0, ciliate)
+ciliate.ord <- ordinate(ciliate.0, "NMDS", "bray")
+p1 = plot_ordination(ciliate.0, ciliate.ord, type="taxa", color="family", title="Giliate families")
+print(p1)
+p2 = plot_ordination(ciliate.0, ciliate.ord, type="samples", color="Site") 
+p2 + geom_polygon(aes(fill=Site)) + geom_point(size=5) + ggtitle("samples")
+
+### Chlorophytes - Green Algae
+
+#Filter to only green algae
+chlorophytes <- subset_taxa(physeq, phylum=="Chlorophyta")
+#chlorophytes <- tax_glom(chlorophytes, taxrank="genus")
+
+#remove 'superkingdom' and 'kingdom' ranks
+tax_table(chlorophytes) <- tax_table(chlorophytes)[,c(3:8)]
+
+#Plot barplots of relevant taxa ranks
+plot_bar(chlorophytes, x="Site", fill="order")#, facet_grid = ~order)
+
+# Conduct ordination
+chlorophytes.0 <- prune_samples(sample_sums(chlorophytes) > 0, chlorophytes)
+chlorophytes.ord <- ordinate(chlorophytes.0, "NMDS", "bray")
+p1 = plot_ordination(chlorophytes.0, chlorophytes.ord, type="taxa", color="family", title="Giliate families")
+print(p1)
+p2 = plot_ordination(chlorophytes.0, chlorophytes.ord, type="samples", color="Site") 
+p2 + geom_polygon(aes(fill=Site)) + geom_point(size=5) + ggtitle("samples")
+
+#Filter to only insects
+insects <- subset_taxa(physeq, class=="Insecta")
+#chlorophytes <- tax_glom(chlorophytes, taxrank="genus")
+
+#remove 'superkingdom' and 'kingdom' ranks
+tax_table(insects) <- tax_table(insects)[,c(4:8)]
+
+#Plot barplots of relevant taxa ranks
+plot_bar(insects, x="Site", fill="order")#, facet_grid = ~order)
+
+# Conduct ordination
+insects.0 <- prune_samples(sample_sums(insects) > 0, insects)
+insects.ord <- ordinate(insects.0, "NMDS", "bray")
+p1 = plot_ordination(insects.0, insects.ord, type="taxa", color="order", title="Insects order")
+print(p1)
+p2 = plot_ordination(insects.0, insects.ord, type="samples", color="Site") 
+p2 + geom_polygon(aes(fill=Site)) + geom_point(size=5) + ggtitle("samples")
+
+
