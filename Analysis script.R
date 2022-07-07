@@ -8,6 +8,7 @@ library(taxa)
 library(phyloseq)
 library(metacoder)
 library(dplyr)
+library(ggrepel)
 
 data <- read_excel("eDNA survey 2022.xlsx")
 coa <- read_xlsx("WLJ602811.xlsx", sheet=1)
@@ -84,6 +85,33 @@ TAX = tax_table(taxmat)
 sampledata <- data.frame(cbind(df$UID, as.Date(df$`Deployment date`), df$period, df$`Waterway name`, df$Site, TICI$TICI_value, TICI$TICI_rating, TICI$TICI_reliability))
 row.names(sampledata) <- df$UID
 colnames(sampledata) <- c('X.SampleID', 'Date', 'Period', 'Waterway', 'Site', 'TICI_val', 'TICI_rating', 'TICI_rel')
+#Fix names of waterways Kyeburn, Linnburn, Loganburn, Taiari, Waipouri
+sampledata <- sampledata %>% 
+  mutate(Waterway = str_replace(Waterway, "Kye burn", "Kyeburn")) %>% 
+  mutate(Waterway = str_replace(Waterway, "Linnburn river", "Linnburn")) %>%
+  mutate(Waterway = str_replace(Waterway, "Logan Burn", "Loganburn")) %>%
+  mutate(Waterway = str_replace(Waterway, "Taiari river", "Taiari River")) %>%
+  mutate(Waterway = str_replace(Waterway, "Taiari River", "Taiari")) %>%
+  mutate(Waterway = str_replace(Waterway, "Waipouri River", "Waipouri Stream")) %>%
+  mutate(Waterway = str_replace(Waterway, "Waihola", "Waihora")) %>%
+  mutate(Waterway = str_replace(Waterway, "Waipouri Stream", "Waipouri")) %>%
+  mutate(Site = str_replace(Site, "Taiari River 1", "T1")) %>% 
+  mutate(Site = str_replace(Site, "Taiari River 2", "T2")) %>%
+  mutate(Site = str_replace(Site, "Taiari 3", "T3")) %>%
+  mutate(Site = str_replace(Site, "Taiari 5", "T4")) %>%
+  mutate(Site = str_replace(Site, "Taiari 6", "T5")) %>%
+  mutate(Site = str_replace(Site, "Taiari 7", "T6")) %>%
+  mutate(Site = str_replace(Site, "Taiari River 8", "T7")) %>%
+  mutate(Site = str_replace(Site, "Taiari 9", "T8")) %>%
+  mutate(Site = str_replace(Site, "Taiari 10", "T9")) %>%
+  mutate(Site = str_replace(Site, "Taieri 10.5", "T10")) %>%
+  mutate(Site = str_replace(Site, "Taiari River 11", "T11")) %>%
+  mutate(Site = str_replace(Site, "Taiari 11.5", "T12")) %>%
+  mutate(Site = str_replace(Site, "Taiari 12", "T13")) %>%
+  mutate(Site = str_replace(Site, "Taiari 13", "T14")) %>%
+  mutate(Site = str_replace(Site, "Taiari 14", "T15"))
+  
+#add to phyloseq object
 sampledata <- sample_data(sampledata)
 sample_names(sampledata) <- paste0("X", sample_names(sampledata))
 
@@ -168,7 +196,7 @@ bac <- subset_taxa(physeq, superkingdom == "Bacteria")
 #Agglomerate bacteria taxa to family level
 bac_glom <- tax_glom(bac, taxrank="family")
 #remove 'kingdom' rank
-tax_table(bac_glom) <- tax_table(bac_glom)[,c(1,3:8)]
+tax_table(bac_glom) <- tax_table(bac_glom)[,c(1,3:6)]
 
 #Plot barplots of relevant taxa ranks
 plot_bar(bac_glom, x="Site", fill="phylum")
@@ -217,6 +245,39 @@ print(p1)
 
 p2 = plot_ordination(bacter, bacter.ord, type="samples", color="Site") 
 p2 + geom_polygon(aes(fill=Site)) + geom_point(size=5) + ggtitle("samples")
+
+# Filter to only mainstem river samples
+bac_tai <- subset_samples(bac, Waterway == "Taiari")
+bac_tai <- phyloseq::subset_samples(bac_tai, Site != "T1")
+bac_tai <- phyloseq::subset_samples(bac_tai, Site != "T2")
+bac_tai <- phyloseq::subset_samples(bac_tai, Site != "T15")# Remove Taiari River 1 as it distorts the data
+bac.tai.ord <- ordinate(bac_tai , "PCoA", "bray")
+p2 <- plot_ordination(bac_tai, bac.tai.ord, type="samples", color="Site") 
+p2 + geom_polygon(aes(fill=Site)) + geom_point(size=5) + ggtitle("samples")
+
+bac.taiari <- data.frame(cbind(bac.tai.ord$vectors[,1:2], data.frame(sample_data(bac_tai))$Site))
+colnames(bac.taiari) <- c("Ax1", "Ax2", "Site")
+bac.taiari$Ax1 <- as.numeric(bac.taiari$Ax1)
+bac.taiari$Ax2 <- as.numeric(bac.taiari$Ax2)
+bac.tai.plot.data <- cbind(aggregate(x = bac.taiari$Ax1, by = list(bac.taiari$Site), FUN = "mean"),
+                           aggregate(x = bac.taiari$Ax2, by = list(bac.taiari$Site), FUN = "mean"))
+bac.tai.plot.data <- as.data.frame(cbind(bac.tai.plot.data[,2], bac.tai.plot.data[,4], bac.tai.plot.data[,1]))
+colnames(bac.tai.plot.data) <- c("Ax1", "Ax2", "Site")
+bac.tai.plot.data$Ax1 <- as.numeric(bac.tai.plot.data$Ax1)
+bac.tai.plot.data$Ax2 <- as.numeric(bac.tai.plot.data$Ax2)
+bac.tai.plot.data$Site <- as.factor(bac.tai.plot.data$Site)
+bac.tai.plot.data <- arrange(bac.tai.plot.data, factor(Site, levels = c("T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11", "T12", "T13", "T14")))
+
+bac.t.ord <- bac.tai.plot.data %>%
+  ggplot() +
+  theme_bw() +
+  geom_point(aes(x=Ax1, y=Ax2, colour=Site), size =3, show.legend = TRUE) +
+  geom_path(aes(x=Ax1, y=Ax2), linetype="dotted") +
+  geom_text(aes(x=Ax1, y=Ax2),
+            label = bac.tai.plot.data$Site,
+            nudge_x = 0.01, nudge_y = 0.01,
+            check_overlap = F)
+
 
 ### Fish
 
@@ -330,5 +391,12 @@ p1 = plot_ordination(insects.0, insects.ord, type="taxa", color="order", title="
 print(p1)
 p2 = plot_ordination(insects.0, insects.ord, type="samples", color="Site") 
 p2 + geom_polygon(aes(fill=Site)) + geom_point(size=5) + ggtitle("samples")
+
+mcdata <- parse_phyloseq(insects)
+heat_tree(mcdata,
+          node_size = n_obs,
+          node_color = n_obs,
+          node_label = taxon_names,
+          tree_label = taxon_names)
 
 
