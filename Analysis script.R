@@ -70,7 +70,7 @@ OTU = otu_table(otumat, taxa_are_rows = TRUE)
 
 ### USE library(txa and metacoder) to do taxonomy for phyloseq
 # x <- lookup_tax_data(taxdf$ID, type = "taxon_id") #takes a while to run
-y <- taxonomy_table(x, use_ranks = c("kingdom", "phylum", "class", "order",
+y <- taxonomy_table(x, use_ranks = c("superkingdom", "kingdom", "phylum", "class", "order",
         "family", "genus", "species"), add_id_col = TRUE)
 y <- data.frame(y)
 rownames(y) <- y$taxon_id
@@ -88,6 +88,7 @@ colnames(sampledata) <- c('X.SampleID', 'Date', 'Period', 'Waterway', 'Site', 'T
 #Fix names of waterways Kyeburn, Linnburn, Loganburn, Taiari, Waipouri
 sampledata <- sampledata %>% 
   mutate(Waterway = str_replace(Waterway, "Kye burn", "Kyeburn")) %>% 
+  mutate(Waterway = str_replace(Waterway, "Hog burn", "Hog Burn")) %>% 
   mutate(Waterway = str_replace(Waterway, "Linnburn river", "Linnburn")) %>%
   mutate(Waterway = str_replace(Waterway, "Logan Burn", "Loganburn")) %>%
   mutate(Waterway = str_replace(Waterway, "Taiari river", "Taiari River")) %>%
@@ -134,6 +135,12 @@ all_pcoa <- ordinate(
   method = "PCoA", 
   distance = "bray"
 )
+
+all_pcoa <- ordinate(physeq, "PCoA", "bray")
+p1 = plot_ordination(physeq, all_pcoa, type="taxa", color="phylum", title="Bacterial phyla")
+print(p1)
+p2 = plot_ordination(physeq, all_pcoa, type="samples", color="Site") 
+p2 + geom_polygon(aes(fill=Waterway)) + geom_point(size=5) + ggtitle("samples")
 
 plot_ordination(
   physeq = phymer,                                                         #phyloseq object
@@ -289,9 +296,9 @@ fish <- merge_phyloseq(subset_taxa(physeq, class=="Hyperoartia"), subset_taxa(ph
 tax_table(fish) <- tax_table(fish)[,c(3:8)]
 
 #Plot barplots of relevant taxa ranks
-plot_bar(fish, x="Site", fill="species", facet_grid = ~order)
+plot_bar(fish, x="Site", fill="family") #, facet_grid = ~order)
 
-plot_bar(subset_taxa(fish, genus == "Galaxias"), x="Site", fill="species")
+plot_bar(subset_taxa(fish, family == "Geotriidae"), x="Site", fill="species")
 
 # Conduct ordination
 fish.0 <- prune_samples(sample_sums(fish) > 0, fish)
@@ -316,6 +323,12 @@ p1 = plot_ordination(gobio.0, gobio.ord, type="taxa", color="species", title="Go
 print(p1)
 p2 = plot_ordination(gobio.0, gobio.ord, type="samples", color="Site") 
 p2 + geom_polygon(aes(fill=Site)) + geom_point(size=5) + ggtitle("samples")
+
+heat_tree(parse_phyloseq(fish),
+          node_size = n_obs,
+          node_color = n_obs,
+          node_label = taxon_names,
+          tree_label = taxon_names)
 
 ### Diatoms
 
