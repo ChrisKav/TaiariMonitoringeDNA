@@ -298,7 +298,23 @@ tax_table(fish) <- tax_table(fish)[,c(3:8)]
 #Plot barplots of relevant taxa ranks
 plot_bar(fish, x="Site", fill="family") #, facet_grid = ~order)
 
+plot_bar(subset_taxa(fish, family == "Anguillidae"), x="Site", fill="species")
 plot_bar(subset_taxa(fish, family == "Geotriidae"), x="Site", fill="species")
+plot_bar(subset_taxa(fish, family == "Percidae"), x="Site", fill="species")
+plot_bar(subset_taxa(fish, family == "Scombridae"), x="Site", fill="genus") #Contamination 3 o'clock
+plot_bar(subset_taxa(fish, family == "Latridae"), x="Site", fill="species") # Blue Moki T1
+plot_bar(subset_taxa(fish, family == "Retropinnidae"), x="Site", fill="species") # Smelt T2
+plot_bar(subset_taxa(fish, family == "Tripterygiidae"), x="Site", fill="species") # Triplefin T1
+plot_bar(subset_taxa(fish, family == "Cheimarrichthyidae"), x="Site", fill="species") # Torrentfish 3 oclock, Meggat Burn and T3
+
+
+plot_bar(subset_taxa(fish, family == "Cheimarrichthyidae"), x="Site", fill="species") # Torrentfish 3 oclock, Meggat Burn and T3
+
+plot_bar(
+  merge_samples(prune_taxa(
+  subset_samples(fish, Site == "T3"), "Site"), taxa_sums > 0),  fill="species", 
+  facet_grid = ~species)
+
 
 # Conduct ordination
 fish.0 <- prune_samples(sample_sums(fish) > 0, fish)
