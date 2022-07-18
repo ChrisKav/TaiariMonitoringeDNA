@@ -44,7 +44,8 @@ df <- df[which(df$UID %in% coa$UID),]
 write.xlsx(df, "COA list.xlsx")
 
 ### OTU Table
-otumat <- data.frame(taxa_data[c(3,6:193)])
+
+otumat <- data.frame(taxa_data[c(3,6:ncol(taxa_data))])
 
 #Need to change TaxID to match ncbi database CHECK!!!
 otumat[which(otumat$TaxID == 10000005),1] = 27462 # Austrosimulium changed to genus
@@ -69,7 +70,7 @@ otumat <- as.matrix(otumat)
 OTU = otu_table(otumat, taxa_are_rows = TRUE)
 
 ### USE library(txa and metacoder) to do taxonomy for phyloseq
-# x <- lookup_tax_data(taxdf$ID, type = "taxon_id") #takes a while to run
+x <- lookup_tax_data(taxdf$ID, type = "taxon_id") #takes a while to run
 y <- taxonomy_table(x, use_ranks = c("superkingdom", "kingdom", "phylum", "class", "order",
         "family", "genus", "species"), add_id_col = TRUE)
 y <- data.frame(y)
@@ -119,6 +120,8 @@ sample_names(sampledata) <- paste0("X", sample_names(sampledata))
 #Build phyloseq object
 physeq = phyloseq(OTU, TAX, sampledata) # Sample data not matching UID
 physeq
+
+#saveRDS(physeq, file = "April 2022 data.rds")
 
 #can use metacoder to revert phyloseq object and produce taxmaps for each segment of river
 #Need to get date in correct format
@@ -171,30 +174,6 @@ heat_tree(x,
           node_color = n_obs,
           node_label = taxon_names,
           tree_label = taxon_names)
-
-
-## Fish only
-
-phyfish = merge_phyloseq(subset_taxa(physeq, class=="Hyperoartia"), subset_taxa(physeq, class=="Actinopteri"))
-phyfish = merge_samples(phyfish, "Site")
-
-mcdata <- parse_phyloseq(phyfish)
-heat_tree(mcdata,
-          node_size = n_obs,
-          node_color = n_obs,
-          node_label = taxon_names,
-          tree_label = taxon_names)
-
-set.seed(1) # This makes the plot appear the same each time it is run 
-
-heat_tree(mcdata, 
-          node_label = taxon_names,
-          node_size = n_obs,
-          node_color = 'Big Stream')#, 
-          node_size_axis_label = "OTU count",
-          node_color_axis_label = "Samples with reads",
-          layout = "davidson-harel", # The primary layout algorithm
-          initial_layout = "reingold-tilford") # The layout algorithm that initializes node locations
 
 ### Bacteria
 
@@ -288,7 +267,6 @@ bac.t.ord <- bac.tai.plot.data %>%
 
 ### Fish
 
-
 #Filter to only fish
 fish <- merge_phyloseq(subset_taxa(physeq, class=="Hyperoartia"), subset_taxa(physeq, class=="Actinopteri"))
 
@@ -306,15 +284,103 @@ plot_bar(subset_taxa(fish, family == "Latridae"), x="Site", fill="species") # Bl
 plot_bar(subset_taxa(fish, family == "Retropinnidae"), x="Site", fill="species") # Smelt T2
 plot_bar(subset_taxa(fish, family == "Tripterygiidae"), x="Site", fill="species") # Triplefin T1
 plot_bar(subset_taxa(fish, family == "Cheimarrichthyidae"), x="Site", fill="species") # Torrentfish 3 oclock, Meggat Burn and T3
+plot_bar(subset_taxa(fish, family == "Salmonidae"), x="Site", fill="genus") # Brown trout everywhere!
+plot_bar(subset_taxa(fish, family == "Galaxiidae"), x="Site", fill="species") # Galaxiids
+plot_bar(subset_taxa(fish, family == "Eleotridae"), x="Site", fill="species") # Bullies
+plot_bar(subset_taxa(fish, family == "Mugilidae"), x="Site", fill="species") # Yellow eyed mullet - T1 and T2, Waihola and Contour Channel
+plot_bar(subset_taxa(fish, family == "Moridae"), x="Site", fill="genus") # T1 Rock cod
+plot_bar(subset_taxa(fish, family == "Gempylidae"), x="Site", fill="species") # T1 Snoek
+plot_bar(subset_taxa(fish, family == "Monacanthidae"), x="Site", fill="species") #T1 Leatherjacket
+plot_bar(subset_taxa(fish, family == "Labridae"), x="Site", fill="species") #parrot fish T1
+plot_bar(subset_taxa(fish, family == "Rhombosoleidae"), x="Site", fill="species") # flounders T1 and T3
+plot_bar(subset_taxa(fish, family == "Hemiramphidae"), x="Site", fill="species") #T1 garfish
+plot_bar(subset_taxa(fish, family == "Carangidae"), x="Site", fill="family") #Jacks
 
+plot_bar(subset_taxa(fish, species == "Galaxias anomalus"), x="Site", fill="species") #CO Rundheads
+plot_bar(subset_taxa(fish, species == "Galaxias argenteus"), x="Site", fill="species") #GKs
+plot_bar(subset_taxa(fish, species == "Galaxias brevipinnis"), x="Site", fill="species") #Koaro
+plot_bar(subset_taxa(fish, species == "Galaxias depressiceps"), x="Site", fill="species") # T Flatheads
+plot_bar(subset_taxa(fish, species == "Galaxias eldoni"), x="Site", fill="species") #Eldons
+plot_bar(subset_taxa(fish, species == "Galaxias fasciatus"), x="Site", fill="species") #Banded Kokopu
+plot_bar(subset_taxa(fish, species == "Galaxias maculatus"), x="Site", fill="species") #Inaka
+plot_bar(subset_taxa(fish, species == "Galaxias pullus"), x="Site", fill="species") #Duskys
+plot_bar(subset_taxa(fish, species == "Galaxias sp. 'teviot'"), x="Site", fill="species") #Teviots - incorrect - anomalus
+plot_bar(subset_taxa(fish, species == "Galaxias sp. D (Allibone et al., 1996)"), x="Site", fill="species") #Clutha flats
 
-plot_bar(subset_taxa(fish, family == "Cheimarrichthyidae"), x="Site", fill="species") # Torrentfish 3 oclock, Meggat Burn and T3
+T1.fish <- subset_samples(fish, Site == c("T1"))
+T1.fish <- prune_taxa(taxa_sums(T1.fish) >0, T1.fish)
+T1.fish <- merge_samples(T1.fish, "Site")
+plot_bar(T1.fish, fill="species", facet_grid = ~species)
 
-plot_bar(
-  merge_samples(prune_taxa(
-  subset_samples(fish, Site == "T3"), "Site"), taxa_sums > 0),  fill="species", 
-  facet_grid = ~species)
+T2.fish <- subset_samples(fish, Site == "T2")
+T2.fish <- prune_taxa(taxa_sums(T2.fish) >0, T2.fish)
+T2.fish <- merge_samples(T2.fish, "Site")
+plot_bar(T2.fish, fill="species", facet_grid = ~species)
 
+T3.fish <- subset_samples(fish, Site == "T3")
+T3.fish <- prune_taxa(taxa_sums(T3.fish) >0, T3.fish)
+T3.fish <- merge_samples(T3.fish, "Site")
+plot_bar(T3.fish, fill="species", facet_grid = ~species)
+
+T4.fish <- subset_samples(fish, Site == "T4")
+T4.fish <- prune_taxa(taxa_sums(T4.fish) >0, T4.fish)
+T4.fish <- merge_samples(T4.fish, "Site")
+plot_bar(T4.fish, fill="species", facet_grid = ~species)
+
+T5.fish <- subset_samples(fish, Site == "T5")
+T5.fish <- prune_taxa(taxa_sums(T5.fish) >0, T5.fish)
+T5.fish <- merge_samples(T5.fish, "Site")
+plot_bar(T5.fish, fill="species", facet_grid = ~species)
+
+T6.fish <- subset_samples(fish, Site == "T6")
+T6.fish <- prune_taxa(taxa_sums(T6.fish) >0, T6.fish)
+T6.fish <- merge_samples(T6.fish, "Site")
+plot_bar(T6.fish, fill="species", facet_grid = ~species)
+
+T7.fish <- subset_samples(fish, Site == "T7")
+T7.fish <- prune_taxa(taxa_sums(T7.fish) >0, T7.fish)
+T7.fish <- merge_samples(T7.fish, "Site")
+plot_bar(T7.fish, fill="species", facet_grid = ~species)
+
+T8.fish <- subset_samples(fish, Site == "T8")
+T8.fish <- prune_taxa(taxa_sums(T8.fish) >0, T8.fish)
+T8.fish <- merge_samples(T8.fish, "Site")
+plot_bar(T8.fish, fill="species", facet_grid = ~species)
+
+T9.fish <- subset_samples(fish, Site == "T9")
+T9.fish <- prune_taxa(taxa_sums(T9.fish) >0, T9.fish)
+T9.fish <- merge_samples(T9.fish, "Site")
+plot_bar(T9.fish, fill="species", facet_grid = ~species)
+
+T10.fish <- subset_samples(fish, Site == "T10")
+T10.fish <- prune_taxa(taxa_sums(T10.fish) >0, T10.fish)
+T10.fish <- merge_samples(T10.fish, "Site")
+plot_bar(T10.fish, fill="species", facet_grid = ~species)
+
+T11.fish <- subset_samples(fish, Site == "T11")
+T11.fish <- prune_taxa(taxa_sums(T11.fish) >0, T11.fish)
+T11.fish <- merge_samples(T11.fish, "Site")
+plot_bar(T11.fish, fill="species", facet_grid = ~species)
+
+T12.fish <- subset_samples(fish, Site == "T12")
+T12.fish <- prune_taxa(taxa_sums(T12.fish) >0, T12.fish)
+T12.fish <- merge_samples(T12.fish, "Site")
+plot_bar(T12.fish, fill="species", facet_grid = ~species)
+
+T13.fish <- subset_samples(fish, Site == "T13")
+T13.fish <- prune_taxa(taxa_sums(T13.fish) >0, T13.fish)
+T13.fish <- merge_samples(T13.fish, "Site")
+plot_bar(T13.fish, fill="species", facet_grid = ~species)
+
+T14.fish <- subset_samples(fish, Site == "T14")
+T14.fish <- prune_taxa(taxa_sums(T14.fish) >0, T14.fish)
+T14.fish <- merge_samples(T14.fish, "Site")
+plot_bar(T14.fish, fill="species", facet_grid = ~species)
+
+T15.fish <- subset_samples(fish, Site == "T15")
+T15.fish <- prune_taxa(taxa_sums(T15.fish) >0, T15.fish)
+T15.fish <- merge_samples(T15.fish, "Site")
+plot_bar(T15.fish, fill="species", facet_grid = ~species)
 
 # Conduct ordination
 fish.0 <- prune_samples(sample_sums(fish) > 0, fish)
@@ -344,7 +410,16 @@ heat_tree(parse_phyloseq(fish),
           node_size = n_obs,
           node_color = n_obs,
           node_label = taxon_names,
-          tree_label = taxon_names)
+          tree_label = taxon_names,
+          layout = "davidson-harel")
+
+### Molluscs
+plot_bar(subset_taxa(physeq, family == "Lymnaeidae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, family == "Planorbidae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, species == "Physella acuta"), x="Site", fill="species")
+plot_bar(subset_taxa(physeq, genus == "Potamopyrgus"), x="Site", fill="species")
+plot_bar(subset_taxa(physeq, family == "Sphaeriidae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, species == "Echyridella menziesii"), x="Site", fill="species")
 
 ### Diatoms
 
@@ -427,5 +502,72 @@ heat_tree(mcdata,
           node_color = n_obs,
           node_label = taxon_names,
           tree_label = taxon_names)
+
+### Arthropods
+plot_bar(subset_taxa(physeq, class == "Branchiopoda"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, family == "Daphniidae"), x="Site", fill="species")
+plot_bar(subset_taxa(physeq, family == "Bosminidae"), x="Site", fill="species")
+plot_bar(subset_taxa(physeq, family == "Chydoridae"), x="Site", fill="species")
+
+plot_bar(subset_taxa(physeq, class == "Ostracoda"), x="Site", fill="genus")
+
+plot_bar(subset_taxa(physeq, class == "Malacostraca"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, species == "Paranephrops zealandicus"), x="Site", fill="species")
+plot_bar(subset_taxa(physeq, order == "Amphipoda"), x="Site", fill="genus")
+
+plot_bar(subset_taxa(physeq, class == "Collembola"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, class == "Collembola"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, class == "Arachnida"), x="Site", fill="family")
+plot_bar(subset_taxa(physeq, class == "Pycnogonida"), x="Site", fill="genus")
+
+plot_bar(subset_taxa(physeq, class == "Insecta"), x="Site", fill="order")
+plot_bar(subset_taxa(physeq, order == "Plecoptera"), x="Site", fill="species")
+plot_bar(subset_taxa(physeq, genus == "Sigara"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, order == "Coleoptera"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, order == "Trichoptera"), x="Site", fill="family")
+plot_bar(subset_taxa(physeq, family == "Hydrobiosidae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, genus == "Psilochorema"), x="Site", fill="species")
+plot_bar(subset_taxa(physeq, genus == "Costachorema"), x="Site", fill="species")
+plot_bar(subset_taxa(physeq, genus == "Hydrobiosis"), x="Site", fill="species")
+plot_bar(subset_taxa(physeq, family == "Leptoceridae"), x="Site", fill="species")
+plot_bar(subset_taxa(physeq, family == "Conoesucidae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, family == "Hydroptilidae"), x="Site", fill="species")
+plot_bar(subset_taxa(physeq, family == "Hydropsychidae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, family == "Philopotamidae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, family == "Polycentropodidae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, family == "Helicopsychidae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, family == "Helicophidae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, family == "Oeconesidae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, order == "Diptera"), x="Site", fill="family")
+plot_bar(subset_taxa(physeq, family == "Chironomidae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, family == "Syrphidae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, family == "Simuliidae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, family == "Culicidae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, family == "Ceratopogonidae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, family == "Cecidomyiidae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, family == "Psychodidae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, family == "Limoniidae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, family == "Ephydridae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, family == "Lonchopteridae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, family == "Syrphidae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, order == "Megaloptera"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, order == "Ephemeroptera"), x="Site", fill="family")
+plot_bar(subset_taxa(physeq, family == "Leptophlebiidae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, genus == "Deleatidium"), x="Site", fill="species")
+plot_bar(subset_taxa(physeq, family == "Coloburiscidae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, family == "Nesameletidae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, family == "Ameletopsidae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, family == "Oniscigastridae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, genus == "Neozephlebia"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, genus == "Zephlebia"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, genus == "Atalophlebioides"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, order == "Odonata"), x="Site", fill="genus")
+
+### Cnidarians
+plot_bar(subset_taxa(physeq, class == "Myxozoa"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, class == "Hydrozoa"), x="Site", fill="order")
+plot_bar(subset_taxa(physeq, order == "Anthoathecata"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, genus == "Hydra"), x="Site", fill="species")
+plot_bar(subset_taxa(physeq, order == "Limnomedusae"), x="Site", fill="genus")
 
 
