@@ -631,9 +631,78 @@ plot_bar(subset_taxa(physeq, genus == "Eudyptula"), x="Site", fill="species") # 
 plot_bar(subset_taxa(physeq, genus == "Porphyrio"), x="Site", fill="species") # Pukeko
 plot_bar(subset_taxa(physeq, genus == "Circus"), x="Site", fill="species") # Swamp Harrier
 
+################################################################
+library(microeco)
+library(file2meco)
+library(pheatmap)
+library(magrittr)
 
+#First remove kingdom rank and rename superkingdom to kingdom
+bac2 <- bac
+tax_table(bac2) <- tax_table(bac2)[,c(1,3:8)]
+colnames(tax_table(bac2)) <- c("Kingdom", "Phylum", "Class", "Order", "Family",  "Genus", "Species")
+#Merge object to Site
+#bac2 = merge_samples(bac2, "Site")
+#Transfer to meco
+meco_dataset <- phyloseq2meco(bac2)
+# create object of trans_func
+t2 <- trans_func$new(meco_dataset)
+# mapping the taxonomy to the database
+# this can recognize prokaryotes or fungi automatically if the names of taxonomic levels are standard.
+# for fungi example, see https://chiliubio.github.io/microeco_tutorial/other-dataset.html#fungi-data
+# default database for prokaryotes is FAPROTAX database
+t2$cal_spe_func(prok_database = "FAPROTAX")
+# return t2$res_spe_func, 1 represent trait exists, 0 represent no or cannot confirmed.
+t2$res_spe_func[1:5, 1:2]
+# calculate the percentages for communities
+# here do not consider the abundance
+t2$cal_spe_func_perc(abundance_weighted = FALSE)
+## The result table is stored in object$res_spe_func_perc ...
+t2$res_spe_func_perc[1:5, 1:2]
+# construct a network for the example
+network <- trans_network$new(dataset = t2, cal_cor = "base", taxa_level = "OTU", filter_thres = 0.0001, cor_method = "spearman")
+network$cal_network(p_thres = 0.01, COR_cut = 0.7)
+network$cal_module()
+# convert module info to microtable object
+meco_module <- network$trans_comm(use_col = "module")
+meco_module_func <- trans_func$new(meco_module)
+meco_module_func$cal_spe_func(prok_database = "FAPROTAX")
+meco_module_func$cal_spe_func_perc(abundance_weighted = FALSE)
+meco_module_func$plot_spe_func_perc()
+# M represents module, ordered by the nodes number from high to low
+# If you want to change the group list, reset the list t2$func_group_list
+t2$func_group_list
+# use show_prok_func to see the detailed information of prokaryotic traits
+t2$show_prok_func("methanotrophy")
+# then we try to correlate the res_spe_func_perc of communities to environmental variables
+t3 <- trans_env$new(dataset = meco_dataset, add_data = data.frame(sample_data(bac2)[,c(1:3,6)]))
+t3$cal_cor(add_abund_table = t2$res_spe_func_perc, cor_method = "spearman")
+t3$plot_cor(pheatmap = TRUE)
 
+t2$res_spe_func_perc
 
+m1 <- trans_func$new(meco_dataset)
+m1
+m1$cal_tax4fun(folderReferenceData = "./SILVA123")
 
+# must transpose to taxa row, sample column
+pathway_file <- m1$tax4fun_path$Tax4FunProfile %>% t %>% as.data.frame
+# filter rownames, only keep ko+number
+rownames(pathway_file) %<>% gsub("(^.*);\\s.*", "\\1", .)
+# load the pathway hierarchical metadata
+data(Tax4Fun2_KEGG)
+# further create a microtable object, familiar?
+func1 <- microtable$new(otu_table = pathway_file, tax_table = Tax4Fun2_KEGG$ptw_desc, sample_table = m1$sample_table)
+print(func1)
 
+func1$tidy_dataset()
+# calculate abundance automatically at three levels: Level.1, Level.2, Level.3
+func1$cal_abund()
+print(func1)
 
+# bar plot at Level.1
+func2 <- trans_abund$new(func1, taxrank = "Level.1", groupmean = "Site")
+func2$plot_bar(legend_text_italic = FALSE)
+
+func2 <- trans_diff$new(dataset = func1, method = "lefse", group = "Site", alpha = 0.05, lefse_subgroup = NULL)
+func2$plot_diff_bar(threshold = 4, width = 0.8)
