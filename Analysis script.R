@@ -564,10 +564,76 @@ plot_bar(subset_taxa(physeq, genus == "Atalophlebioides"), x="Site", fill="genus
 plot_bar(subset_taxa(physeq, order == "Odonata"), x="Site", fill="genus")
 
 ### Cnidarians
+plot_bar(subset_taxa(physeq, phylum == "Cnidaria"), x="Site", fill="order")
 plot_bar(subset_taxa(physeq, class == "Myxozoa"), x="Site", fill="genus")
 plot_bar(subset_taxa(physeq, class == "Hydrozoa"), x="Site", fill="order")
 plot_bar(subset_taxa(physeq, order == "Anthoathecata"), x="Site", fill="genus")
 plot_bar(subset_taxa(physeq, genus == "Hydra"), x="Site", fill="species")
 plot_bar(subset_taxa(physeq, order == "Limnomedusae"), x="Site", fill="genus")
+
+
+### Proifera
+plot_bar(subset_taxa(physeq, phylum == "Porifera"), x="Site", fill="order")
+
+### Bryzoa
+plot_bar(subset_taxa(physeq, phylum == "Bryozoa"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, genus == "Electra"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, family == "Plumatellidae"), x="Site", fill="species")
+plot_bar(subset_taxa(physeq, family == "Fredericellidae"), x="Site", fill="genus")
+
+### Rotifera
+plot_bar(subset_taxa(physeq, phylum == "Rotifera"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, order == "Ploima"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, order == "Flosculariaceae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, order == "Philodinida"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, order == "Adinetida"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, order == "Philodinavidae"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, genus == "Rotaria"), x="Site", fill="species")
+
+### Platyhelminthes
+plot_bar(subset_taxa(physeq, phylum == "Platyhelminthes"), x="Site", fill="family")
+plot_bar(subset_taxa(physeq, class == "Rhabditophora"), x="Site", fill="family")
+plot_bar(subset_taxa(physeq, order == "Tricladida"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, order == "Rhabdocoela"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, order == "Macrostomida"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, order == "Lecithoepitheliata"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, class == "Trematoda"), x="Site", fill="family")
+plot_bar(subset_taxa(physeq, class == "Catenulida"), x="Site", fill="family")
+
+plot_bar(subset_taxa(physeq, phylum == "Nemertea"), x="Site", fill="species")
+plot_bar(subset_taxa(physeq, phylum == "Tardigrada"), x="Site", fill="family")
+
+plot_bar(subset_taxa(physeq, phylum == "Annelida"), x="Site", fill="family")
+plot_bar(subset_taxa(physeq, class == "Polychaeta"), x="Site", fill="order")
+plot_bar(subset_taxa(physeq, order == "Tubificida"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, order == "Enchytraeida"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, order == "Lumbriculida"), x="Site", fill="genus")
+plot_bar(subset_taxa(physeq, order == "Rhynchobdellida"), x="Site", fill="genus")
+
+plot_bar(subset_taxa(physeq, phylum == "Gastrotricha"), x="Site", fill="species")
+
+plot_bar(subset_taxa(physeq, phylum == "Nematoda"), x="Site", fill="family")
+
+plot_bar(subset_taxa(physeq, class == "Amphibia"), x="Site", fill="genus") # Frogs at Eden Creek
+
+###Birds
+
+plot_bar(subset_taxa(physeq, genus == "Charadrius"), x="Site", fill="species") # New Zealand dotterel Kyeburn
+plot_bar(subset_taxa(physeq, genus == "Hemiphaga"), x="Site", fill="species") # Kereru Silverstream and Traquair
+plot_bar(subset_taxa(physeq, genus == "Zosterops"), x="Site", fill="species") # Silvereye
+plot_bar(subset_taxa(physeq, genus == "Gerygone"), x="Site", fill="species") # Riroriro
+plot_bar(subset_taxa(physeq, genus == "Anthornis"), x="Site", fill="species") # Korimako
+plot_bar(subset_taxa(physeq, genus == "Petroica"), x="Site", fill="species") # Tomtit
+plot_bar(subset_taxa(physeq, genus == "Phalacrocorax"), x="Site", fill="species") # Cormorant
+plot_bar(subset_taxa(physeq, genus == "Microcarbo"), x="Site", fill="species") # Cormorant
+plot_bar(subset_taxa(physeq, genus == "Egretta"), x="Site", fill="species") # White Heron
+plot_bar(subset_taxa(physeq, genus == "Eudyptula"), x="Site", fill="species") # Little penguin at Waipouri
+plot_bar(subset_taxa(physeq, genus == "Porphyrio"), x="Site", fill="species") # Pukeko
+plot_bar(subset_taxa(physeq, genus == "Circus"), x="Site", fill="species") # Swamp Harrier
+
+
+
+
+
 
 
