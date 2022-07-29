@@ -64,12 +64,13 @@ otumat <- aggregate(x = otumat, by = list(otumat$TaxID), FUN = function(x) na.om
 
 #write.csv(otumat, "x1.csv") # for checking
 
+### SETUP TO IMPORT INTO PHYSLOSEQ
 row.names(otumat) <- otumat$TaxID
 otumat$TaxID <- NULL
 otumat <- as.matrix(otumat)
 OTU = otu_table(otumat, taxa_are_rows = TRUE)
 
-### USE library(txa and metacoder) to do taxonomy for phyloseq
+### USE library(taxa and metacoder) to do taxonomy for phyloseq
 x <- lookup_tax_data(taxdf$ID, type = "taxon_id") #takes a while to run
 y <- taxonomy_table(x, use_ranks = c("superkingdom", "kingdom", "phylum", "class", "order",
         "family", "genus", "species"), add_id_col = TRUE)
@@ -78,7 +79,7 @@ rownames(y) <- y$taxon_id
 y$taxon_id <- NULL
 taxmat <- as.matrix(y)
 
-# write.csv(y, "tax_table.csv") # Check
+# write.csv(taxmat, "tax_table.csv") # Check
 
 TAX = tax_table(taxmat)
 
@@ -265,6 +266,7 @@ bac.t.ord <- bac.tai.plot.data %>%
             check_overlap = F)
 
 
+
 ### Fish
 
 #Filter to only fish
@@ -433,12 +435,22 @@ tax_table(diatom) <- tax_table(diatom)[,c(3:8)]
 plot_bar(diatom, x="Site", fill="order")#, facet_grid = ~order)
 
 # Conduct ordination
-diatom.0 <- prune_samples(sample_sums(diatoms) > 0, diatoms)
-diatom.ord <- ordinate(diatom.0, "NMDS", "bray")
+diatom.0 <- prune_samples(sample_sums(diatom) > 0, diatom)
+diatom.ord <- ordinate(diatom.0, "PCoA", "bray")
 p1 = plot_ordination(diatom.0, diatom.ord, type="taxa", color="family", title="Diatom family")
 print(p1)
 p2 = plot_ordination(diatom.0, diatom.ord, type="samples", color="Site") 
 p2 + geom_polygon(aes(fill=Site)) + geom_point(size=5) + ggtitle("samples")
+
+plot_bar(subset_taxa(diatom, phylum == "Bacillariophyta"), x="Site", fill="family")
+plot_bar(subset_taxa(diatom, class == "Bacillariophyceae"), x="Site", fill="family")
+plot_bar(subset_taxa(diatom, family == "Gomphonemataceae"), x="Site", fill="genus")
+plot_bar(subset_taxa(diatom, genus == "Didymosphenia"), x="Site", fill="species")
+plot_bar(subset_taxa(diatom, class == "Coscinodiscophyceae"), x="Site", fill="order")
+plot_bar(subset_taxa(diatom, family == "Cymbellaceae"), x="Site", fill="genus")
+plot_bar(subset_taxa(diatom, phylum == "Bacillariophyta"), x="Site", fill="class")
+plot_bar(subset_taxa(diatom, order == "Melosirales"), x="Site", fill="family")
+
 
 #Filter to only ciliates
 ciliate <- subset_taxa(physeq, phylum=="Ciliophora")
@@ -480,7 +492,6 @@ p2 + geom_polygon(aes(fill=Site)) + geom_point(size=5) + ggtitle("samples")
 
 #Filter to only insects
 insects <- subset_taxa(physeq, class=="Insecta")
-#chlorophytes <- tax_glom(chlorophytes, taxrank="genus")
 
 #remove 'superkingdom' and 'kingdom' ranks
 tax_table(insects) <- tax_table(insects)[,c(4:8)]
@@ -501,7 +512,8 @@ heat_tree(mcdata,
           node_size = n_obs,
           node_color = n_obs,
           node_label = taxon_names,
-          tree_label = taxon_names)
+          tree_label = taxon_names,
+          layout = "davidson-harel")
 
 ### Arthropods
 plot_bar(subset_taxa(physeq, class == "Branchiopoda"), x="Site", fill="genus")
@@ -641,8 +653,14 @@ library(magrittr)
 bac2 <- bac
 tax_table(bac2) <- tax_table(bac2)[,c(1,3:8)]
 colnames(tax_table(bac2)) <- c("Kingdom", "Phylum", "Class", "Order", "Family",  "Genus", "Species")
-#Merge object to Site
-#bac2 = merge_samples(bac2, "Site")
+
+heat_tree(parse_phyloseq(bac2),
+          node_size = n_obs,
+          node_color = n_obs,
+          node_label = taxon_names,
+          tree_label = taxon_names,
+          layout = "davidson-harel")
+
 #Transfer to meco
 meco_dataset <- phyloseq2meco(bac2)
 # create object of trans_func
@@ -673,7 +691,7 @@ meco_module_func$plot_spe_func_perc()
 # If you want to change the group list, reset the list t2$func_group_list
 t2$func_group_list
 # use show_prok_func to see the detailed information of prokaryotic traits
-t2$show_prok_func("methanotrophy")
+t2$show_prok_func("nitrate_reduction")
 # then we try to correlate the res_spe_func_perc of communities to environmental variables
 t3 <- trans_env$new(dataset = meco_dataset, add_data = data.frame(sample_data(bac2)[,c(1:3,6)]))
 t3$cal_cor(add_abund_table = t2$res_spe_func_perc, cor_method = "spearman")
@@ -701,7 +719,7 @@ func1$cal_abund()
 print(func1)
 
 # bar plot at Level.1
-func2 <- trans_abund$new(func1, taxrank = "Level.1", groupmean = "Site")
+func2 <- trans_abund$new(func1, taxrank = "Level.3", groupmean = "Site")
 func2$plot_bar(legend_text_italic = FALSE)
 
 func2 <- trans_diff$new(dataset = func1, method = "lefse", group = "Site", alpha = 0.05, lefse_subgroup = NULL)
