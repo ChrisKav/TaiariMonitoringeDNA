@@ -650,7 +650,8 @@ library(pheatmap)
 library(magrittr)
 
 #First remove kingdom rank and rename superkingdom to kingdom
-bac2 <- bac
+bac2 <-  merge_phyloseq(subset_taxa(physeq, superkingdom=="Bacteria"), subset_taxa(physeq, superkingdom=="Archaea"))
+
 tax_table(bac2) <- tax_table(bac2)[,c(1,3:8)]
 colnames(tax_table(bac2)) <- c("Kingdom", "Phylum", "Class", "Order", "Family",  "Genus", "Species")
 
@@ -697,7 +698,14 @@ t3 <- trans_env$new(dataset = meco_dataset, add_data = data.frame(sample_data(ba
 t3$cal_cor(add_abund_table = t2$res_spe_func_perc, cor_method = "spearman")
 t3$plot_cor(pheatmap = TRUE)
 
-t2$res_spe_func_perc
+View(t2$res_spe_func_perc)
+
+m1 <- trans_abund$new(dataset = meco_dataset, taxrank = 'Phylum', groupmean = "Site", ntaxa = 5)
+m1$plot_pie(facet_nrow = 5)
+
+
+
+
 
 m1 <- trans_func$new(meco_dataset)
 m1
