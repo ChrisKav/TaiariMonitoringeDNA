@@ -1,0 +1,250 @@
+---
+title: "April Taiari eDNA Survey"
+author: "Christopher Kavazos"
+date: '`r Sys.Date()`'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load Packages
+
+The following packages are required to run this analaysis
+
+```{r package, error = FALSE, message = FALSE, warning=FALSE}
+library(readxl)
+library(openxlsx)
+library(splitstackshape)
+library(data.table)
+library(lubridate)
+library(dplyr)
+library(tidyverse)
+library(taxa)
+library(phyloseq)
+library(metacoder)
+library(dplyr)
+library(ggrepel)
+library(microeco)
+library(file2meco)
+library(pheatmap)
+library(magrittr)
+library(speedyseq)
+```
+
+## Load data
+
+This analysis requires three datasets. 'meta' is the metadata that is available in metadata.xlsx. The eDNA results provides the taxonmic read count data and TICI health scores and is available in WLJ602811.xlsx.
+
+```{r pressure, echo=TRUE, message = FALSE}
+meta <- read_excel("metadata.xlsx")
+taxa_data <- read_xlsx("WLJ602811.xlsx", sheet=2)
+TICI <- read_xlsx("WLJ602811.xlsx", sheet=4)
+
+#Chain of custody information is also used to run checks
+coa <- read_xlsx("WLJ602811.xlsx", sheet=1)
+coa <- coa[19:nrow(coa),]
+colnames(coa) <- coa[1,]
+coa <- data.frame(coa[2:nrow(coa),])
+```
+
+# Import into phyloseq
+
+A number of steps are required to get the data formated correctly for us in phyloseq. Three sets of data are required. 1) The sample_data which is found in 'meta'; 2) The taxa read counts found in 'taxa_data' and 3) the taxonomic information which we will obtain from NCBI.
+
+## Sample data
+Prepare sample_data for import into phyloseq
+```{r sample}
+# mutate data.frame into long format by UID
+df <- cSplit(meta, "UID", sep = ",", direction = "long")
+
+#Calculate deployment period
+df$`Retrieval date` <- as.Date(df$`Retrieval date`, format = "%y/%m/%d")
+df$`Deployment date` <- as.Date(df$`Deployment date`, format = "%y/%m/%d")
+
+Retrieval = data.frame(
+  date=df$`Retrieval date`,
+  time=format(df$`Retrieval time`, "%H:%M")
+)
+
+Deployment = data.frame(
+  date=df$`Deployment date`,
+  time=format(df$`Deployment time`, "%H:%M")
+)
+
+Deployment <- as.POSIXct(paste(Deployment$date, Deployment$time), format="%Y-%m-%d %H:%M")
+Retrieval <- as.POSIXct(paste(Retrieval$date, Retrieval$time), format="%Y-%m-%d %H:%M")
+
+#Make new column with sample period
+df$period <- round(difftime(Retrieval, Deployment, units = "hours"),1)
+
+#Trim data frame to UID's with read counts
+df <- df[which(df$UID %in% coa$UID),]
+```
+
+Data from REC2 model is incorporated into metadata (https://niwa.co.nz/freshwater-and-estuaries/management-tools/river-environment-classification-0). Cumulative land uses data are to be transformed here to a percentage of upstream catchment area.
+
+```{r REC2}
+df <- data.frame(df)
+df[,57:85] <- (df[,57:85] / df[,34])*100 # Land cover data base
+df[,86:97] <- (df[,86:97] / df[,34])*100 # Top rock SI database
+
+```
+
+Make rownames of dataframe UID and add TICI values to sampledata dataframe df.
+
+```{r df_rownames}
+row.names(df) <- df$UID
+TICI <- data.frame(TICI)
+row.names(TICI) <- TICI$UID
+
+df <- merge(df, TICI[,3:7], by='row.names', all=TRUE)
+df$Row.names <- NULL
+colnames(df)[6] <- "X.SampleID"
+df <- relocate(df, "X.SampleID")
+row.names(df) <- df$X.SampleID
+```
+
+Add to a sample_data phyloseq object and add an 'X' to sample names
+
+```{r sample_to_phyloseq}
+sampledata <- sample_data(df)
+sample_names(sampledata) <- paste0("X", sample_names(sampledata))
+```
+
+## Taxa read counts
+
+This section prepares the taxa read count data for input into phyloseq Taxa IDs are provided by their NCBI ID. Samples are columns and taxa rows. Values represent the total read counts for that particular taxa for each sample.
+
+```{r taxa}
+# Select relevant columns from the Wilderlab output
+otumat <- data.frame(taxa_data[c(3,6:ncol(taxa_data))])
+
+# Change TaxID to match ncbi database
+otumat[which(otumat$TaxID == 10000005),1] = 27462 # Austrosimulium changed to genus
+otumat[which(otumat$TaxID == 10000018),1] = 126351 # Changed to Gal spD
+otumat[which(otumat$TaxID == 10000020),1] = 89553 # Changed to Giant Kokopu
+otumat[which(otumat$TaxID == 10000033),1] = 309669 # Changed to genus
+otumat[which(otumat$TaxID == 10000037),1] = 65076 # Changed to genus
+otumat[which(otumat$TaxID == 10000038),1] = 226931 # Changed to Common Bully
+otumat[which(otumat$TaxID == 10000043),1] = 98305 #Changed to genus
+otumat[which(otumat$TaxID == 10000052),1] = 75837 # Changed to Brown Teal
+otumat[which(otumat$TaxID == 10000053),1] = 126303 # Changed to Gal dep
+otumat[which(otumat$TaxID == 10000054),1] = 126303 # Changed to Gal dep
+
+#Combine rows with same TaxID
+otumat <- aggregate(x = otumat, by = list(otumat$TaxID), FUN = function(x) na.omit(x)[1])[,-1]
+
+# Now import into phyloseq
+row.names(otumat) <- otumat$TaxID
+taxdf <- otumat$TaxID # data required for obtaining taxonomic information
+otumat$TaxID <- NULL
+otumat <- as.matrix(otumat)
+OTU = otu_table(otumat, taxa_are_rows = TRUE)
+```
+
+## Taxonomy
+
+Here, the NCBI database is called to obtain the taxonomic information for each taxa present in the data set. This data includes the taxonomic ranks for each taxa, such as Super Kingdom, Kingdom, Phylum, Class, Order, Family, Genus and Species. The package 'metacoder' is used here to connect to NCBI. It is useful to use 'write.csv' to produce a list which can be filtered in excel to easily explore the results.
+
+```{r taxonomy}
+# Use library(taxa and metacoder) to do taxonomy for phyloseq
+#x <- lookup_tax_data(taxdf, type = "taxon_id") #takes a while to run
+y <- taxonomy_table(x, use_ranks = c("superkingdom", "kingdom", "phylum", "class", "order",
+        "family", "genus", "species"), add_id_col = TRUE)
+y <- data.frame(y)
+rownames(y) <- y$taxon_id
+y$taxon_id <- NULL
+taxmat <- as.matrix(y)
+
+# write.csv(taxmat, "tax_table.csv")
+
+# Make a phyloseq object
+TAX = tax_table(taxmat)
+```
+
+## Build phyloseq object
+
+The final step is to combine the taxa abundance data with the sample data (metadata) and taxonomic information. This data is all saved as a phyloseq object called 'physeq'. This is a useful format to save the data as it incorporates all the sequencing information, metadata and taxonomic information.
+
+```{r phyloseq_object}
+physeq = phyloseq(OTU, TAX, sampledata) # Sample data not matching UID
+physeq
+#saveRDS(physeq, file = "April 2022 data.rds")
+```
+
+# Superkingdom: Bacteria
+
+The following details an exploratory data analysis and some detail on the functional ecology of the bacterial populations detected during this survey.
+
+First we must filter the 'physeq' data set to only bacterial taxa.
+
+```{r}
+#Filter to only bacteria
+bac <- subset_taxa(physeq, superkingdom == "Bacteria")
+#remove 'kingdom' rank
+tax_table(bac) <- tax_table(bac)[,c(1,3:8)]
+```
+
+To understand the taxonomic composition of each site, we will rarefy the dataset to an even sampling depth so that we can plot a comparable bar plot.
+
+The sampling size is determined as 90% of the sample with the smallest sampling size (approximately 2700). Data for each Site is combined to aid interpretation.
+
+The samples were largely dominated by taxa belonging to either Bacteroidetes or Proteobacteria. The relative proportions of these two phyla varied between sites.
+
+```{r}
+bac.site <- merge_samples2(bac, "Site", fun_otu = sum, funs = list(), reorder = FALSE)
+bac.rarefied = rarefy_even_depth(bac.site, rngseed=1, sample.size=0.9*min(sample_sums(bac.site)), replace=F)
+plot_bar(bac.rarefied, x="Site", fill="phylum") + facet_wrap(~SubCatch, scales = "free_x", nrow=3)
+```
+
+```{r}
+plot_richness(bac.site, x="Altitude", color="Waterway.name", measures=c("Observed"))
+plot_richness(bac.site, x="SubCatch", measures=c("Observed", "Shannon")) + geom_boxplot()
+
+```
+
+A network representation of samples, representing samples that occur in similar profiles of bacterial community.
+
+```{r}
+ig = make_network(bac, type = "samples", distance = "bray", max.dist = 0.3)
+plot_network(ig, bac, color = "Site", shape = "SubCatch", line_weight = 0.4) #, label = NULL)
+```
+
+A network representation of OTUs, representing communities of bacteria that occur in similar profiles of samples
+
+```{r}
+# prune to just the top 100 most abundant OTUs across all samples (crude).
+jg = make_network(bac, "taxa", "bray", 0.3)
+plot_network(jg, bac, "taxa", color = "phylum", line_weight = 0.4) #, label = NULL)
+```
+
+```{r}
+bac.MDS = ordinate(bac, method = "PCoA", distance = "bray")
+ptitle = "Bacterial PCoA od Bray Curtis distances"
+p = plot_ordination(bac, bac.MDS, type = "samples", color = "Site", title = ptitle)
+p + geom_point(size = 5) + geom_polygon(aes(fill = Site))
+
+```
+
+```{r}
+p4title = "Bacterial dataset, PCoA ordination on Bray-Curtis distance"
+bac.ord = ordinate(bac, method = "PCoA", distance = "bray")
+plot_ordination(bac, bac.ord, "samples", color = "Altitude", title = p4title) + geom_point(size = 4)
+plot_ordination(bac, bac.ord, "samples", color = "Downstream.distance", title = p4title) + geom_point(size = 4)
+plot_ordination(bac, bac.ord, "samples", color = "us_catarea", title = p4title) + geom_point(size = 4)
+
+```
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```
+
+```{r}
+```

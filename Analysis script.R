@@ -134,6 +134,11 @@ phymer = merge_samples(physeq, "Site")
 #need to build usable sample_data()
 
 #ordination plot of all site
+
+ig = make_network(physeq, type = "samples", distance = "bray", max.dist = 0.85)
+plot_network(ig, physeq, color = "Waterway.name", shape = "SubCatch", line_weight = 0.4, 
+             label = NULL)
+
 all_pcoa <- ordinate(
   physeq = phymer, 
   method = "PCoA", 
@@ -186,7 +191,7 @@ bac_glom <- tax_glom(bac, taxrank="family")
 tax_table(bac_glom) <- tax_table(bac_glom)[,c(1,3:6)]
 
 #Plot barplots of relevant taxa ranks
-plot_bar(bac_glom, x="Site", fill="phylum")
+plot_bar(bac, x="Waterway.name", fill="phylum")
 
 plot_bar(subset_taxa(bac_glom, phylum == "Proteobacteria"), x="Site", fill="order", facet_grid = ~class)
 plot_bar(subset_taxa(bac_glom, phylum == "Chloroflexi"), x="Site", fill="class")
