@@ -31,6 +31,9 @@ library(file2meco)
 library(pheatmap)
 library(magrittr)
 library(speedyseq)
+library(gridExtra)
+
+set.seed(1)
 ```
 
 ## Load data
@@ -187,6 +190,40 @@ bac <- subset_taxa(physeq, superkingdom == "Bacteria")
 tax_table(bac) <- tax_table(bac)[,c(1,3:8)]
 ```
 
+First, we want to understand the distribution of read counts. These results are very unusual as most sequences are common throughout the data set.
+
+```{r}
+sort(sample_sums(bac))
+hist(sample_sums(bac), xlab="Total Read Counts")
+
+```
+
+Here we describe the most abundant bacteria taxa. A total of 562,621 bacterial reads were detected. Taxa ID 237 (Genus Flavobacterium) was the most abundant with 212,242 reads, followed by 101 (Genus Flectobacillus) with 41,999 reads.
+
+```{r}
+sum(taxa_sums(bac))
+sort(taxa_sums(bac))[(length(taxa_sums(bac))-10):length(taxa_sums(bac))]
+
+```
+
+Of those reads, the phyla Proteobacteria and Bacteroidetes are the most diverse with 164 and 57 taxa, respectively.
+
+```{r}
+ntaxa(subset_taxa(bac, phylum == "Proteobacteria"))
+ntaxa(subset_taxa(bac, phylum == "Bacteroidetes"))
+```
+Taxonomic tree using the `metacoder` package.
+
+```{r bac_tree}
+heat_tree(parse_phyloseq(bac),
+          node_size = n_obs,
+          node_color = n_obs,
+          node_label = taxon_names,
+          tree_label = taxon_names,
+          layout = "davidson-harel")
+
+```
+
 To understand the taxonomic composition of each site, we will rarefy the dataset to an even sampling depth so that we can plot a comparable bar plot.
 
 The sampling size is determined as 90% of the sample with the smallest sampling size (approximately 2700). Data for each Site is combined to aid interpretation.
@@ -195,13 +232,47 @@ The samples were largely dominated by taxa belonging to either Bacteroidetes or 
 
 ```{r}
 bac.site <- merge_samples2(bac, "Site", fun_otu = sum, funs = list(), reorder = FALSE)
+bac.site.rel <- transform_sample_counts(bac.site, function(x) x/sum(x)) # Transform counts to relative proportions
 bac.rarefied = rarefy_even_depth(bac.site, rngseed=1, sample.size=0.9*min(sample_sums(bac.site)), replace=F)
 plot_bar(bac.rarefied, x="Site", fill="phylum") + facet_wrap(~SubCatch, scales = "free_x", nrow=3)
 ```
 
+There was a general trend of bacterial richness increasing from upstream to downstream sites.
+
 ```{r}
-plot_richness(bac.site, x="Altitude", color="Waterway.name", measures=c("Observed"))
-plot_richness(bac.site, x="SubCatch", measures=c("Observed", "Shannon")) + geom_boxplot()
+plot_richness(bac.rarefied, x="Downstream.distance", color="Type", measures=c("Observed", "Chao1", "Shannon")) + 
+  geom_smooth(method='lm', se=TRUE)
+plot_richness(bac.rarefied, x="Temp", measures=c("Observed", "Chao1", "Shannon")) + 
+  geom_smooth(method='lm', se=TRUE)
+plot_richness(bac.rarefied, x="Altitude", measures=c("Observed", "Chao1", "Shannon")) + 
+  geom_smooth(method='lm', se=TRUE)
+plot_richness(bac.rarefied, x="us_catarea", measures=c("Observed", "Chao1", "Shannon")) + 
+  geom_smooth(method='lm', se=TRUE)
+
+```
+
+PCoA of entire bacterial dataset. Probably best todo at a site level to have an easier interpretable MDS
+
+``` {r}
+bac.ord <- ordinate(bac, "PCoA", "bray")
+p1 = plot_ordination(bac, bac.ord, type="taxa", color="phylum", title="Bacterial phyla")
+p1
+p2 = plot_ordination(bac, bac.ord, type="samples", color="Site") 
+p2 + geom_polygon(aes(fill=Site)) + geom_point(size=5) + ggtitle("samples") +
+p2
+```
+
+The first two axes of PCoA using Bray Curtis distances explained 38.6% of the variation in bacterial community composition. There were no clearly discernible patterns between the sites and bacterial community composition. No clear patterns emerged between tributary and main stem community composition. There was some evidence of weak clustering occurring between sites at similar upstream distances. For instance, T1, Waipouri 1, Lee Creek and Owhiro Stream all had similar compositions.
+
+``` {r}
+bac.ord <- ordinate(bac.site, "PCoA", "bray")
+p2 <- plot_ordination(bac.site, bac.ord, type="samples", color="Downstream.distance", shape="Type") +
+  theme_bw() +
+  geom_point(size=10) + 
+  geom_text(aes(label = Site), size = 5, vjust = 0.5, hjust = 0.5, color="black") +
+  scale_colour_gradient(low = "yellow", high = "darkblue") +
+  ggtitle("PCoA: Bray-Curtis")
+p2
 
 ```
 
@@ -220,31 +291,179 @@ jg = make_network(bac, "taxa", "bray", 0.3)
 plot_network(jg, bac, "taxa", color = "phylum", line_weight = 0.4) #, label = NULL)
 ```
 
+## Bacteria functional traits
+
+Functional traits are analysed using the 'meco' package. First need to get data into meco format.
+
 ```{r}
-bac.MDS = ordinate(bac, method = "PCoA", distance = "bray")
-ptitle = "Bacterial PCoA od Bray Curtis distances"
-p = plot_ordination(bac, bac.MDS, type = "samples", color = "Site", title = ptitle)
-p + geom_point(size = 5) + geom_polygon(aes(fill = Site))
+#First remove kingdom rank and rename superkingdom to kingdom
+bac2 <-  merge_phyloseq(subset_taxa(physeq, superkingdom=="Bacteria"), subset_taxa(physeq, superkingdom=="Archaea"))
+bac2 <- merge_samples2(bac2, "Site", fun_otu = sum, funs = list(), reorder = FALSE)
+
+tax_table(bac2) <- tax_table(bac2)[,c(1,3:8)]
+colnames(tax_table(bac2)) <- c("Kingdom", "Phylum", "Class", "Order", "Family",  "Genus", "Species")#Transfer to meco
+#bac2 <- tax_glom(bac2, taxrank = "Genus")
+meco_dataset <- phyloseq2meco(bac2)
+# create object of trans_func
+t2 <- trans_func$new(meco_dataset)
+```
+
+```{r}
+# mapping the taxonomy to the database
+# this can recognize prokaryotes or fungi automatically if the names of taxonomic levels are standard.
+# for fungi example, see https://chiliubio.github.io/microeco_tutorial/other-dataset.html#fungi-data
+# default database for prokaryotes is FAPROTAX database
+t2$cal_spe_func(prok_database = "FAPROTAX")
+# return t2$res_spe_func, 1 represent trait exists, 0 represent no or cannot confirmed.
+t2$res_spe_func[1:5, 1:2]
+# calculate the percentages for communities
+# here do not consider the abundance
+t2$cal_spe_func_perc(abundance_weighted = FALSE)
+## The result table is stored in object$res_spe_func_perc ...
+t2$res_spe_func_perc[1:5, 1:2]
+# construct a network for the example
+network <- trans_network$new(dataset = t2, cal_cor = "base", taxa_level = "OTU", filter_thres = 0.0001, cor_method = "spearman")
+network$cal_network(p_thres = 0.01, COR_cut = 0.7)
+network$cal_module()
+# convert module info to microtable object
+meco_module <- network$trans_comm(use_col = "module")
+meco_module_func <- trans_func$new(meco_module)
+meco_module_func$cal_spe_func(prok_database = "FAPROTAX")
+meco_module_func$cal_spe_func_perc(abundance_weighted = FALSE)
+meco_module_func$plot_spe_func_perc()
+# M represents module, ordered by the nodes number from high to low
+# If you want to change the group list, reset the list t2$func_group_list
+t2$func_group_list
+# use show_prok_func to see the detailed information of prokaryotic traits
+t2$show_prok_func("nitrate_reduction")
+# then we try to correlate the res_spe_func_perc of communities to environmental variables
+t3 <- trans_env$new(dataset = meco_dataset, add_data = data.frame(sample_data(bac2)[,c(13,14,17,19,22,29,30,34)]))
+t3$cal_cor(add_abund_table = t2$res_spe_func_perc, cor_method = "spearman")
+t3$plot_cor(pheatmap = TRUE)
+
+View(t2$res_spe_func_perc)
+
+m1 <- trans_abund$new(dataset = meco_dataset, taxrank = 'Phylum', groupmean = "Site", ntaxa = 5)
+m1$plot_pie(facet_nrow = 5)
+
 
 ```
 
 ```{r}
-p4title = "Bacterial dataset, PCoA ordination on Bray-Curtis distance"
-bac.ord = ordinate(bac, method = "PCoA", distance = "bray")
-plot_ordination(bac, bac.ord, "samples", color = "Altitude", title = p4title) + geom_point(size = 4)
-plot_ordination(bac, bac.ord, "samples", color = "Downstream.distance", title = p4title) + geom_point(size = 4)
-plot_ordination(bac, bac.ord, "samples", color = "us_catarea", title = p4title) + geom_point(size = 4)
+t1 <- trans_env$new(dataset = meco_dataset, env_cols = c(13,17,19,22,29,30,34)) #Conductivity not included due to not being recorded at all sites
 
 ```
 
 ```{r}
+# use Wilcoxon Rank Sum and Signed Rank Tests as an example
+t1$cal_diff(group = "SubCatch", method = "wilcox")
+t1$res_diff[, c(1, 2, 4, 6, 7)]
 ```
 
 ```{r}
+t1$cal_diff(method = "anova", group = "SubCatch")
+# place all the plots into a list
+tmp <- list()
+for(i in colnames(t1$data_env)){
+    tmp[[i]] <- t1$plot_diff(measure = i, add_sig_text_size = 5, xtext_size = 12) + theme(plot.margin = unit(c(0.1, 0, 0, 1), "cm"))
+}
+plot(arrangeGrob(grobs = tmp, ncol = 3))
 ```
 
 ```{r}
+# require GGally package installed
+t1$cal_autocor()
 ```
 
 ```{r}
+t1$cal_autocor(group = "SubCatch")
+```
+
+```{r}
+# use bray-curtis distance to do dbrda
+t1$cal_ordination(method = "dbRDA", use_measure = "bray")
+# t1$res_rda is the result list stored in the object
+t1$trans_ordination(adjust_arrow_length = FALSE, max_perc_env = 1.5)
+# t1$res_rda_trans is the transformed result for plotting
+t1$plot_ordination(plot_color = "SubCatch")
+```
+
+```{r}
+# use Genus
+t1$cal_ordination(method = "RDA", taxa_level = "Genus")
+# As the main results of RDA are related with the projection and angles between different arrows,
+# we adjust the length of the arrow to show them clearly using several parameters.
+t1$trans_ordination(show_taxa = 10, adjust_arrow_length = TRUE, max_perc_env = 1.5, max_perc_tax = 1.5, min_perc_env = 0.2, min_perc_tax = 0.2)
+# t1$res_rda_trans is the transformed result for plotting
+t1$plot_ordination(plot_color = "SubCatch")
+```
+
+
+```{r}
+t1$cal_mantel(use_measure = "bray")
+# return t1$res_mantel
+t1$res_mantel
+```
+
+```{r}
+t1$dataset$cal_abund()
+t1$cal_cor(use_data = "Genus", p_adjust_method = "fdr")
+```
+
+```{r}
+# default ggplot2 method with clustering
+t1$plot_cor()
+
+```
+
+```{r}
+# filter genera that do not have at least one ***
+t1$plot_cor(filter_feature = c("", "*"))
+```
+
+```{r}
+# first create trans_diff object as a demonstration
+t2 <- trans_diff$new(dataset = meco_dataset, method = "rf", group = "SubCatch", rf_taxa_level = "Family")
+# then create trans_env object
+t1 <- trans_env$new(dataset = meco_dataset, env_cols = c(13,17,19,22,29,30,34))
+# use other_taxa to select taxa you need
+t1$cal_cor(use_data = "other", p_adjust_method = "fdr", other_taxa = t2$res_rf$Taxa[1:40])
+t1$plot_cor()
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
 ```
