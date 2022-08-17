@@ -154,7 +154,7 @@ Here, the NCBI database is called to obtain the taxonomic information for each t
 
 ```{r taxonomy}
 # Use library(taxa and metacoder) to do taxonomy for phyloseq
-#x <- lookup_tax_data(taxdf, type = "taxon_id") #takes a while to run
+x <- lookup_tax_data(taxdf, type = "taxon_id") #takes a while to run
 y <- taxonomy_table(x, use_ranks = c("superkingdom", "kingdom", "phylum", "class", "order",
         "family", "genus", "species"), add_id_col = TRUE)
 y <- data.frame(y)
@@ -259,7 +259,7 @@ bac.ord <- ordinate(bac, "PCoA", "bray")
 p1 = plot_ordination(bac, bac.ord, type="taxa", color="phylum", title="Bacterial phyla")
 p1
 p2 = plot_ordination(bac, bac.ord, type="samples", color="Site") 
-p2 + geom_polygon(aes(fill=Site)) + geom_point(size=5) + ggtitle("samples") +
+p2 + geom_polygon(aes(fill=Site)) + geom_point(size=5) + ggtitle("samples")
 p2
 ```
 

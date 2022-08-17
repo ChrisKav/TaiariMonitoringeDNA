@@ -285,6 +285,9 @@ plot_bar(fish, x="Site", fill="family") #, facet_grid = ~order)
 
 plot_bar(subset_taxa(fish, family == "Anguillidae"), x="Site", fill="species")
 plot_bar(subset_taxa(fish, family == "Geotriidae"), x="Site", fill="species")
+
+plot_bar(subset_taxa(physeq, family == "Geotriidae"), x="Site", fill="species")
+
 plot_bar(subset_taxa(fish, family == "Percidae"), x="Site", fill="species")
 plot_bar(subset_taxa(fish, family == "Scombridae"), x="Site", fill="genus") #Contamination 3 o'clock
 plot_bar(subset_taxa(fish, family == "Latridae"), x="Site", fill="species") # Blue Moki T1
