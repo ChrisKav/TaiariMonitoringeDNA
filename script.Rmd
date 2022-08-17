@@ -58,6 +58,7 @@ A number of steps are required to get the data formated correctly for us in phyl
 
 ## Sample data
 Prepare sample_data for import into phyloseq
+
 ```{r sample}
 # mutate data.frame into long format by UID
 df <- cSplit(meta, "UID", sep = ",", direction = "long")
@@ -208,7 +209,7 @@ sort(taxa_sums(bac))[(length(taxa_sums(bac))-10):length(taxa_sums(bac))]
 
 Of those reads, the phyla Proteobacteria and Bacteroidetes are the most diverse with 164 and 57 taxa, respectively.
 
-```{r}
+```{r ntaxa}
 ntaxa(subset_taxa(bac, phylum == "Proteobacteria"))
 ntaxa(subset_taxa(bac, phylum == "Bacteroidetes"))
 ```
@@ -251,7 +252,7 @@ plot_richness(bac.rarefied, x="us_catarea", measures=c("Observed", "Chao1", "Sha
 
 ```
 
-PCoA of entire bacterial dataset. Probably best todo at a site level to have an easier interpretable MDS
+PCoA of entire bacterial dataset. Probably best to do at a site level to have an interpretable MDS plot
 
 ``` {r}
 bac.ord <- ordinate(bac, "PCoA", "bray")
@@ -291,11 +292,11 @@ jg = make_network(bac, "taxa", "bray", 0.3)
 plot_network(jg, bac, "taxa", color = "phylum", line_weight = 0.4) #, label = NULL)
 ```
 
-## Bacteria functional traits
+## Bacterial environemntal relationship
 
-Functional traits are analysed using the 'meco' package. First need to get data into meco format.
+First need to get data into meco format. Including Archae for this analysis
 
-```{r}
+```{r meco_input}
 #First remove kingdom rank and rename superkingdom to kingdom
 bac2 <-  merge_phyloseq(subset_taxa(physeq, superkingdom=="Bacteria"), subset_taxa(physeq, superkingdom=="Archaea"))
 bac2 <- merge_samples2(bac2, "Site", fun_otu = sum, funs = list(), reorder = FALSE)
@@ -304,23 +305,102 @@ tax_table(bac2) <- tax_table(bac2)[,c(1,3:8)]
 colnames(tax_table(bac2)) <- c("Kingdom", "Phylum", "Class", "Order", "Family",  "Genus", "Species")#Transfer to meco
 #bac2 <- tax_glom(bac2, taxrank = "Genus")
 meco_dataset <- phyloseq2meco(bac2)
-# create object of trans_func
-t2 <- trans_func$new(meco_dataset)
 ```
 
-```{r}
+Create trans_env object for downstream analysis. Also build abundance table.
+
+```{r add_env_data}
+t1 <- trans_env$new(dataset = meco_dataset, env_cols = c(13,17,19,22,57,64,69:72,76:78,81,84,85)) #Conductivity not included due to not being recorded at all sites
+t1$dataset$cal_abund()
+```
+
+Use 'cal_diff' to test the significance of variables between groups
+
+```{r cal_diff}
+# use Wilcoxon Rank Sum and Signed Rank Tests as an example
+t1$cal_diff(group = "SubCatch", method = "wilcox")
+t1$res_diff[, c(1, 2, 4, 6, 7)]
+```
+
+Present the results as box plots
+
+```{r env_boxplots}
+t1$cal_diff(method = "anova", group = "SubCatch")
+# place all the plots into a list
+tmp <- list()
+for(i in colnames(t1$data_env)){
+    tmp[[i]] <- t1$plot_diff(measure = i, add_sig_text_size = 3, xtext_size = 8, ytext_size = 5) + theme(plot.margin = unit(c(0.1, 0, 0, 1), "cm"))
+}
+plot(arrangeGrob(grobs = tmp, ncol = 4))
+```
+
+Now show autocorrelation between variables
+
+```{r env_autocorrelation}
+# require GGally package installed
+t1$cal_autocor()
+```
+
+And the distribution of variables and autocorrelation between the different groups.
+
+```{r env_group_correlation}
+t1$cal_autocor(group = "SubCatch")
+```
+
+Now use db-RDA to summarise data graphically with 10 most common families
+
+```{r dbRDA}
+# use Genus
+t1$cal_ordination(method = "RDA", taxa_level = "Family")
+# As the main results of RDA are related with the projection and angles between different arrows,
+# we adjust the length of the arrow to show them clearly using several parameters.
+t1$trans_ordination(show_taxa = 10, adjust_arrow_length = TRUE, max_perc_env = 1.5, max_perc_tax = 1.5, min_perc_env = 0.2, min_perc_tax = 0.2)
+# t1$res_rda_trans is the transformed result for plotting
+t1$plot_ordination(plot_color = "SubCatch")
+```
+
+Use Mantel test to understand relationship of bacterial communities with the env_data. Downstream distance the only important factor.
+
+```{r mantel}
+t1$cal_mantel(use_measure = "bray")
+# return t1$res_mantel
+t1$res_mantel
+```
+Now look at specifi bacterial families and their relationships with the env_data
+```{r cor_env}
+t1$cal_cor(use_data = "Family", p_adjust_method = "fdr")
+# default ggplot2 method with clustering
+# filter Family that do not have at least one *** and add clusters
+t1$plot_cor(pheatmap = TRUE, filter_feature = c("", "*"), color_palette = rev(RColorBrewer::brewer.pal(n = 9, name = "RdYlBu")))
+```
+
+## Bacteria functional traits
+
+Functional traits are analysed using the 'meco' package. Need to build a new meco 'trans_fun' object called t2.
+
+```{r assign_functions}
+# create object of trans_func
+t2 <- trans_func$new(meco_dataset)
 # mapping the taxonomy to the database
 # this can recognize prokaryotes or fungi automatically if the names of taxonomic levels are standard.
 # for fungi example, see https://chiliubio.github.io/microeco_tutorial/other-dataset.html#fungi-data
 # default database for prokaryotes is FAPROTAX database
 t2$cal_spe_func(prok_database = "FAPROTAX")
 # return t2$res_spe_func, 1 represent trait exists, 0 represent no or cannot confirmed.
-t2$res_spe_func[1:5, 1:2]
+t2$res_spe_func[20:25, 1:10]
+```
+
+The percentages of OTUs having the trait reflect functional redundancy in the community.
+
+```{r fun_relative}
 # calculate the percentages for communities
 # here do not consider the abundance
 t2$cal_spe_func_perc(abundance_weighted = FALSE)
 ## The result table is stored in object$res_spe_func_perc ...
-t2$res_spe_func_perc[1:5, 1:2]
+t2$res_spe_func_perc[20:25, 1:10]
+```
+
+```{r fun_network}
 # construct a network for the example
 network <- trans_network$new(dataset = t2, cal_cor = "base", taxa_level = "OTU", filter_thres = 0.0001, cor_method = "spearman")
 network$cal_network(p_thres = 0.01, COR_cut = 0.7)
@@ -332,136 +412,84 @@ meco_module_func$cal_spe_func(prok_database = "FAPROTAX")
 meco_module_func$cal_spe_func_perc(abundance_weighted = FALSE)
 meco_module_func$plot_spe_func_perc()
 # M represents module, ordered by the nodes number from high to low
+```
+
+```{r functional_groups}
 # If you want to change the group list, reset the list t2$func_group_list
 t2$func_group_list
 # use show_prok_func to see the detailed information of prokaryotic traits
 t2$show_prok_func("nitrate_reduction")
+```
+
+```{r}
 # then we try to correlate the res_spe_func_perc of communities to environmental variables
-t3 <- trans_env$new(dataset = meco_dataset, add_data = data.frame(sample_data(bac2)[,c(13,14,17,19,22,29,30,34)]))
+t3 <- trans_env$new(dataset = meco_dataset, add_data = data.frame(sample_data(bac2)[,c(13,17,19,22,57,64,69:72,76:78,81,84,85)]))
 t3$cal_cor(add_abund_table = t2$res_spe_func_perc, cor_method = "spearman")
 t3$plot_cor(pheatmap = TRUE)
+```
 
-View(t2$res_spe_func_perc)
-
+```{r}
 m1 <- trans_abund$new(dataset = meco_dataset, taxrank = 'Phylum', groupmean = "Site", ntaxa = 5)
 m1$plot_pie(facet_nrow = 5)
+```
 
+## Bacteria differentiation between three catchment areas
 
+```{r}
+meco_dataset2 <- meco_dataset
+meco_dataset2$tax_table %<>% tidy_taxonomy
+meco_dataset2$tidy_dataset()
+meco_dataset2$cal_abund()
+# metastat analysis at Genus level
+t4 <- trans_diff$new(dataset = meco_dataset2, method = "metastat", group = "SubCatch", taxa_level = "Family")
 ```
 
 ```{r}
-t1 <- trans_env$new(dataset = meco_dataset, env_cols = c(13,17,19,22,29,30,34)) #Conductivity not included due to not being recorded at all sites
-
-```
-
-```{r}
-# use Wilcoxon Rank Sum and Signed Rank Tests as an example
-t1$cal_diff(group = "SubCatch", method = "wilcox")
-t1$res_diff[, c(1, 2, 4, 6, 7)]
-```
-
-```{r}
-t1$cal_diff(method = "anova", group = "SubCatch")
-# place all the plots into a list
-tmp <- list()
-for(i in colnames(t1$data_env)){
-    tmp[[i]] <- t1$plot_diff(measure = i, add_sig_text_size = 5, xtext_size = 12) + theme(plot.margin = unit(c(0.1, 0, 0, 1), "cm"))
-}
-plot(arrangeGrob(grobs = tmp, ncol = 3))
-```
-
-```{r}
-# require GGally package installed
-t1$cal_autocor()
-```
-
-```{r}
-t1$cal_autocor(group = "SubCatch")
-```
-
-```{r}
-# use bray-curtis distance to do dbrda
-t1$cal_ordination(method = "dbRDA", use_measure = "bray")
-# t1$res_rda is the result list stored in the object
-t1$trans_ordination(adjust_arrow_length = FALSE, max_perc_env = 1.5)
-# t1$res_rda_trans is the transformed result for plotting
-t1$plot_ordination(plot_color = "SubCatch")
-```
-
-```{r}
-# use Genus
-t1$cal_ordination(method = "RDA", taxa_level = "Genus")
-# As the main results of RDA are related with the projection and angles between different arrows,
-# we adjust the length of the arrow to show them clearly using several parameters.
-t1$trans_ordination(show_taxa = 10, adjust_arrow_length = TRUE, max_perc_env = 1.5, max_perc_tax = 1.5, min_perc_env = 0.2, min_perc_tax = 0.2)
-# t1$res_rda_trans is the transformed result for plotting
-t1$plot_ordination(plot_color = "SubCatch")
+# select_group should be one of groups in t1$res_diff$Comparison
+t4$plot_diff_abund(use_number = 1:20, select_group = "Plains - Maniatoto")
 ```
 
 
 ```{r}
-t1$cal_mantel(use_measure = "bray")
-# return t1$res_mantel
-t1$res_mantel
+t4 <- trans_diff$new(dataset = meco_dataset2, method = "lefse", group = "SubCatch", alpha = 0.5, lefse_subgroup = NULL)
+# see t1$res_diff for the result
+# From v0.8.0, threshold is used for the LDA score selection.
+t4$plot_diff_bar(threshold = 4)
+# we show 20 taxa with the highest LDA (log10)
+t4$plot_diff_bar(use_number = 1:30, width = 0.8, group_order = c("Plains", "Strath", "Maniatoto"))
 ```
 
 ```{r}
-t1$dataset$cal_abund()
-t1$cal_cor(use_data = "Genus", p_adjust_method = "fdr")
+# clade_label_level 5 represent phylum level in this analysis
+# require ggtree package
+t4$plot_diff_cladogram(use_taxa_num = 100, use_feature_num = 50, clade_label_level = 5, group_order = c("Plains", "Strath", "Maniatoto"))
 ```
 
 ```{r}
-# default ggplot2 method with clustering
-t1$plot_cor()
-
+# use Genus level for parameter taxa_level, if you want to use all taxa, change to "all"
+# nresam = 1 and boots = 1 represent no bootstrapping and use all samples directly
+t4 <- trans_diff$new(dataset = meco_dataset2, method = "rf", group = "SubCatch", taxa_level = "Family")
+# plot the MeanDecreaseGini bar
+g1 <- t4$plot_diff_bar(use_number = 1:20, group_order = c("Plains", "Strath", "Maniatoto"))
+# plot the abundance using same taxa in g1
+g2 <- t4$plot_diff_abund(group_order = c("Plains", "Strath", "Maniatoto"), select_taxa = t4$plot_diff_bar_taxa)
+# now the y axis in g1 and g2 is same, so we can merge them
+# remove g1 legend; remove g2 y axis text and ticks
+g1 <- g1 + theme(legend.position = "none")
+g2 <- g2 + theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+gridExtra::grid.arrange(g1, g2, ncol = 2, nrow = 1, widths = c(2, 1.7))
 ```
 
 ```{r}
-# filter genera that do not have at least one ***
-t1$plot_cor(filter_feature = c("", "*"))
+t4 <- trans_diff$new(dataset = meco_dataset2, method = "wilcox", group = "SubCatch", taxa_level = "Family", filter_thres = 0.05)
+# filter something not needed to show
+t4$res_diff %<>% subset(Significance %in% "***")
+t4$plot_diff_abund(use_number = 1:20, add_sig = T, add_sig_label = "Significance")
 ```
 
 ```{r}
-# first create trans_diff object as a demonstration
-t2 <- trans_diff$new(dataset = meco_dataset, method = "rf", group = "SubCatch", rf_taxa_level = "Family")
-# then create trans_env object
-t1 <- trans_env$new(dataset = meco_dataset, env_cols = c(13,17,19,22,29,30,34))
-# use other_taxa to select taxa you need
-t1$cal_cor(use_data = "other", p_adjust_method = "fdr", other_taxa = t2$res_rf$Taxa[1:40])
-t1$plot_cor()
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
-
+t4 <- trans_diff$new(dataset = meco_dataset2, method = "anova", group = "SubCatch", taxa_level = "Genus", filter_thres = 0.05)
+t4$plot_diff_abund(use_number = 1:10, add_sig = T, coord_flip = F)
 ```
 
 ```{r}
