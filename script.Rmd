@@ -52,6 +52,42 @@ colnames(coa) <- coa[1,]
 coa <- data.frame(coa[2:nrow(coa),])
 ```
 
+# Environmental analysis
+
+```{r env, echo=TRUE}
+env <- read_excel("metadata2.xlsx")
+rec <- read.csv("river-environment-classification-new-zealand-2010-deprecated.csv")
+rec2 <- read.csv("River_Environment_Classification_(REC2)_New_Zealand.csv")
+
+rec$WKT <- NULL
+names(rec)[names(rec) == 'NZREACH'] <- 'nzreach_re'
+
+env <- merge(env, rec2, by.x = "nzsegment")
+env <- merge(env, rec, by = "nzreach_re")
+
+main_env <- subset(env, Type == "Main") %>%
+  select(Site, Latitude, Longitude, Temp, Cond, CUM_AREA, LENGTHDOWN, upElev, segslpmean, LANDCOVER) %>%
+  arrange(LENGTHDOWN)
+main_env$CUM_AREA <- round(main_env$CUM_AREA/1000000,0)
+main_env$LENGTHDOWN <- round(main_env$LENGTHDOWN/1000,1)
+main_env$upElev <- round(main_env$upElev, 0)
+main_env$segslpmean <- round(main_env$segslpmean, 2)
+main_env$Temp <- round(main_env$Temp, 1)
+
+#write.table(main_env, file = "main_env.txt", sep = ",", quote = FALSE, row.names = F)
+
+trib_env <- subset(env, Type == "Trib") %>%
+  arrange(`SubCatch`, LENGTHDOWN) %>%
+  select(Site, Latitude, Longitude, Temp, Cond, CUM_AREA, LENGTHDOWN, upElev, segslpmean, LANDCOVER,`SubCatch`)
+trib_env$CUM_AREA <- round(trib_env$CUM_AREA/1000000,0)
+trib_env$LENGTHDOWN <- round(trib_env$LENGTHDOWN/1000,1)
+trib_env$upElev <- round(trib_env$upElev, 0)
+trib_env$segslpmean <- round(trib_env$segslpmean, 2)
+trib_env$Temp <- round(trib_env$Temp, 1)
+
+#write.table(trib_env, file = "trib_env.txt", sep = ",", quote = FALSE, row.names = F)
+```
+
 # Import into phyloseq
 
 A number of steps are required to get the data formated correctly for us in phyloseq. Three sets of data are required. 1) The sample_data which is found in 'meta'; 2) The taxa read counts found in 'taxa_data' and 3) the taxonomic information which we will obtain from NCBI.
@@ -362,9 +398,9 @@ t1$plot_ordination(plot_color = "SubCatch")
 Use Mantel test to understand relationship of bacterial communities with the env_data. Downstream distance the only important factor.
 
 ```{r mantel}
-t1$cal_mantel(use_measure = "bray")
+#t1$cal_mantel(use_measure = "bray")
 # return t1$res_mantel
-t1$res_mantel
+#t1$res_mantel
 ```
 Now look at specifi bacterial families and their relationships with the env_data
 ```{r cor_env}
@@ -468,23 +504,23 @@ t4$plot_diff_cladogram(use_taxa_num = 100, use_feature_num = 50, clade_label_lev
 ```{r}
 # use Genus level for parameter taxa_level, if you want to use all taxa, change to "all"
 # nresam = 1 and boots = 1 represent no bootstrapping and use all samples directly
-t4 <- trans_diff$new(dataset = meco_dataset2, method = "rf", group = "SubCatch", taxa_level = "Family")
+#t4 <- trans_diff$new(dataset = meco_dataset2, method = "rf", group = "SubCatch", taxa_level = "Family")
 # plot the MeanDecreaseGini bar
-g1 <- t4$plot_diff_bar(use_number = 1:20, group_order = c("Plains", "Strath", "Maniatoto"))
+#g1 <- t4$plot_diff_bar(use_number = 1:20, group_order = c("Plains", "Strath", "Maniatoto"))
 # plot the abundance using same taxa in g1
-g2 <- t4$plot_diff_abund(group_order = c("Plains", "Strath", "Maniatoto"), select_taxa = t4$plot_diff_bar_taxa)
+#g2 <- t4$plot_diff_abund(group_order = c("Plains", "Strath", "Maniatoto"), select_taxa = t4$plot_diff_bar_taxa)
 # now the y axis in g1 and g2 is same, so we can merge them
 # remove g1 legend; remove g2 y axis text and ticks
-g1 <- g1 + theme(legend.position = "none")
-g2 <- g2 + theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
-gridExtra::grid.arrange(g1, g2, ncol = 2, nrow = 1, widths = c(2, 1.7))
+#g1 <- g1 + theme(legend.position = "none")
+#g2 <- g2 + theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+#gridExtra::grid.arrange(g1, g2, ncol = 2, nrow = 1, widths = c(2, 1.7))
 ```
 
 ```{r}
-t4 <- trans_diff$new(dataset = meco_dataset2, method = "wilcox", group = "SubCatch", taxa_level = "Family", filter_thres = 0.05)
+#t4 <- trans_diff$new(dataset = meco_dataset2, method = "wilcox", group = "SubCatch", taxa_level = "Family", filter_thres = 0.05)
 # filter something not needed to show
-t4$res_diff %<>% subset(Significance %in% "***")
-t4$plot_diff_abund(use_number = 1:20, add_sig = T, add_sig_label = "Significance")
+#t4$res_diff %<>% subset(Significance %in% "***")
+#t4$plot_diff_abund(use_number = 1:20, add_sig = T, add_sig_label = "Significance")
 ```
 
 ```{r}
