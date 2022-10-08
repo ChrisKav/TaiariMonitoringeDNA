@@ -32,6 +32,8 @@ library(pheatmap)
 library(magrittr)
 library(speedyseq)
 library(gridExtra)
+library(openintro)
+library(lattice)
 
 set.seed(1)
 ```
@@ -66,26 +68,39 @@ env <- merge(env, rec2, by.x = "nzsegment")
 env <- merge(env, rec, by = "nzreach_re")
 
 main_env <- subset(env, Type == "Main") %>%
-  select(Site, Latitude, Longitude, Temp, Cond, CUM_AREA, LENGTHDOWN, upElev, segslpmean, LANDCOVER) %>%
+  select(Site, Latitude, Longitude, StreamOrde, Temp, Cond, CUM_AREA, LENGTHDOWN, upElev, LANDCOVER, SRC_OF_FLW, GEOLOGY, VLY_LNDFRM) %>%
   arrange(LENGTHDOWN)
 main_env$CUM_AREA <- round(main_env$CUM_AREA/1000000,0)
 main_env$LENGTHDOWN <- round(main_env$LENGTHDOWN/1000,1)
 main_env$upElev <- round(main_env$upElev, 0)
-main_env$segslpmean <- round(main_env$segslpmean, 2)
 main_env$Temp <- round(main_env$Temp, 1)
-
-#write.table(main_env, file = "main_env.txt", sep = ",", quote = FALSE, row.names = F)
+main_env$Cond <- round(main_env$Cond, 1)
+main_env$LENGTHDOWN <- round(main_env$LENGTHDOWN, 1)
+main_env$Latitude <- round(main_env$Latitude, 5)
+main_env$Longitude <- round(main_env$Longitude, 5)
 
 trib_env <- subset(env, Type == "Trib") %>%
   arrange(`SubCatch`, LENGTHDOWN) %>%
-  select(Site, Latitude, Longitude, Temp, Cond, CUM_AREA, LENGTHDOWN, upElev, segslpmean, LANDCOVER,`SubCatch`)
+  select(Site, Latitude, Longitude, StreamOrde, Temp, Cond, CUM_AREA, LENGTHDOWN, upElev, LANDCOVER, SRC_OF_FLW, GEOLOGY, VLY_LNDFRM)
 trib_env$CUM_AREA <- round(trib_env$CUM_AREA/1000000,0)
 trib_env$LENGTHDOWN <- round(trib_env$LENGTHDOWN/1000,1)
 trib_env$upElev <- round(trib_env$upElev, 0)
-trib_env$segslpmean <- round(trib_env$segslpmean, 2)
 trib_env$Temp <- round(trib_env$Temp, 1)
+trib_env$Cond <- round(trib_env$Cond, 1)
+trib_env$LENGTHDOWN <- round(trib_env$LENGTHDOWN, 1)
+trib_env$Latitude <- round(trib_env$Latitude, 5)
+trib_env$Longitude <- round(trib_env$Longitude, 5)
 
-#write.table(trib_env, file = "trib_env.txt", sep = ",", quote = FALSE, row.names = F)
+env2 <- rbind(main_env, trib_env)
+
+#write.table(env2, file = "env.txt", sep = ",", quote = FALSE, row.names = F)
+```
+
+```{r plot_env}
+barchart(env$SRC_OF_FLW, horizontal = FALSE)
+barchart(env$GEOLOGY, horizontal = FALSE)
+barchart(env$LANDCOVER, horizontal = FALSE)
+barchart(env$VLY_LNDFRM, horizontal = FALSE)
 ```
 
 # Import into phyloseq
@@ -212,6 +227,54 @@ The final step is to combine the taxa abundance data with the sample data (metad
 physeq = phyloseq(OTU, TAX, sampledata) # Sample data not matching UID
 physeq
 #saveRDS(physeq, file = "April 2022 data.rds")
+```
+
+# Summary of taxonomic
+
+```{r tax_sum}
+protozoa <- subset_taxa(physeq,
+                        phylum=="Rhodophyta" | class=="Chrysophyceae" | class=="Xanthophyceae" | 
+                          class=="Phaeophyceae" | class=="Synurophyceae" | class=="Eustigmatophyceae" |
+                          class=="Dictyochophyceae" | class=="Pelagophyceae" | phylum=="Oomycota" |
+                          class=="Bigyra" | class=="Dinophyceae" | phylum=="Apicomplexa" |
+                          phylum=="Ciliophora" | family=="Alphamonaceae" | phylum=="Foraminifera" |
+                          phylum=="Endomyxa" | phylum=="Imbricatea"| phylum=="Cercozoa" |
+                          phylum=="Haptophyta" | class=="Centroplasthelida" | class=="Cryptophyceae" |
+                          phylum=="Euglenozoa" | phylum=="Heterolobosea" | class=="Ichthyosporea" |
+                          class=="Choanoflagellata" | order=="Rotosphaerida" | class=="Aphelidea" |
+                          phylum=="Parabasalia" | phylum=="Evosea" | phylum=="Tubulinea" |
+                          phylum=="Discosea" | order=="Apusomonadida" | order=="Ancyromonadida" |
+                          phylum=="Hemimastigophora")
+
+crustacea <- subset_taxa(physeq,
+                         class=="Branchiopoda" | class=="Ostracoda" | class=="Malacostraca" | class=="Hexanauplia")
+
+taxa.rich.table <- data.frame(rbind(
+  c("Bacteria", ntaxa(tax_glom(subset_taxa(physeq, superkingdom == "Bacteria"), "family")), ntaxa(tax_glom(subset_taxa(physeq, superkingdom == "Bacteria"), "genus"))),
+  c("Fungi", ntaxa(tax_glom(subset_taxa(physeq, kingdom == "Fungi"), "family")), ntaxa(tax_glom(subset_taxa(physeq, kingdom == "Fungi"), "genus"))),
+  c("Chlorphyta", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Chlorophyta"), "family")), ntaxa(tax_glom(subset_taxa(physeq, phylum == "Chlorophyta"), "genus"))),
+  c("Fungi", ntaxa(tax_glom(subset_taxa(physeq, kingdom == "Fungi"), "family")), ntaxa(tax_glom(subset_taxa(physeq, kingdom == "Fungi"), "genus"))),
+  c("Protists", ntaxa(tax_glom(protozoa, "family")), ntaxa(tax_glom(protozoa, "genus"))),
+  c("Diatoms", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Bacillariophyta"), "family")), ntaxa(tax_glom(subset_taxa(physeq, phylum == "Bacillariophyta"), "genus"))),
+  c("Plants", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Streptophyta"), "family")), ntaxa(tax_glom(subset_taxa(physeq, phylum == "Streptophyta"), "genus"))),
+  c("Rotifer", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Rotifera"), "family")), ntaxa(tax_glom(subset_taxa(physeq, phylum == "Rotifera"), "genus"))),
+  c("Tardigrade", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Tardigrada"), "family")), ntaxa(tax_glom(subset_taxa(physeq, phylum == "Tardigrada"), "genus"))),
+  c("Porifera", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Porifera"), "family")), ntaxa(tax_glom(subset_taxa(physeq, phylum == "Porifera"), "genus"))),
+  c("Cnidaria", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Cnidaria"), "family")), ntaxa(tax_glom(subset_taxa(physeq, phylum == "Cnidaria"), "genus"))),
+  c("Gastrotricha", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Gastrotricha"), "family")), ntaxa(tax_glom(subset_taxa(physeq, phylum == "Gastrotricha"), "genus"))),
+  c("Platyhelminthes", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Platyhelminthes"), "family")), ntaxa(tax_glom(subset_taxa(physeq, phylum == "Platyhelminthes"), "genus"))),
+  c("Nemertea", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Nemertea"), "family")), ntaxa(tax_glom(subset_taxa(physeq, phylum == "Nemertea"), "genus"))),
+  c("Nematoda", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Nematoda"), "family")), ntaxa(tax_glom(subset_taxa(physeq, phylum == "Nematoda"), "genus"))),
+  c("Annelida", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Annelida"), "family")), ntaxa(tax_glom(subset_taxa(physeq, phylum == "Annelida"), "genus"))),
+  c("Mollusca", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Mollusca"), "family")), ntaxa(tax_glom(subset_taxa(physeq, phylum == "Mollusca"), "genus"))),
+  c("Crustacea", ntaxa(tax_glom(crustacea, "family")), ntaxa(tax_glom(crustacea, "genus"))),
+  c("Insects", ntaxa(tax_glom(subset_taxa(physeq, class == "Insecta"), "family")), ntaxa(tax_glom(subset_taxa(physeq, class == "Insecta"), "genus"))),
+  c("Fish", ntaxa(tax_glom(subset_taxa(physeq, class == "Actinopteri" | class=="Hyperoartia"), "family")), ntaxa(tax_glom(subset_taxa(physeq, class == "Actinopteri" | class=="Hyperoartia"), "genus"))),
+  c("Birds", ntaxa(tax_glom(subset_taxa(physeq, class == "Aves"), "family")), ntaxa(tax_glom(subset_taxa(physeq, class == "Aves"), "genus")))
+))
+
+colnames(taxa.rich.table) <- c("Taxa", "Family", "Genus")
+
 ```
 
 # Superkingdom: Bacteria
