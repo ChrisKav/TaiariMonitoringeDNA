@@ -91,7 +91,7 @@ trib_env$LENGTHDOWN <- round(trib_env$LENGTHDOWN, 1)
 trib_env$Latitude <- round(trib_env$Latitude, 5)
 trib_env$Longitude <- round(trib_env$Longitude, 5)
 
-env2 <- rbind(main_env, trib_env)
+meta <- rbind(main_env, trib_env)
 
 #write.table(env2, file = "env.txt", sep = ",", quote = FALSE, row.names = F)
 ```
@@ -112,7 +112,7 @@ Prepare sample_data for import into phyloseq
 
 ```{r sample}
 # mutate data.frame into long format by UID
-df <- cSplit(meta, "UID", sep = ",", direction = "long")
+df <- cSplit(env, "UID", sep = ",", direction = "long")
 
 #Calculate deployment period
 df$`Retrieval date` <- as.Date(df$`Retrieval date`, format = "%y/%m/%d")
@@ -138,25 +138,26 @@ df$period <- round(difftime(Retrieval, Deployment, units = "hours"),1)
 df <- df[which(df$UID %in% coa$UID),]
 ```
 
-Data from REC2 model is incorporated into metadata (https://niwa.co.nz/freshwater-and-estuaries/management-tools/river-environment-classification-0). Cumulative land uses data are to be transformed here to a percentage of upstream catchment area.
+Data from REC2 model is incorporated into metadata (https://niwa.co.nz/freshwater-and-estuaries/management-tools/river-environment-classification-0). Cumulative land uses data are to be transformed here to a percentage of upstream catchment area. UPDATE - Using REC model no so no need to change these values.
 
 ```{r REC2}
-df <- data.frame(df)
-df[,57:85] <- (df[,57:85] / df[,34])*100 # Land cover data base
-df[,86:97] <- (df[,86:97] / df[,34])*100 # Top rock SI database
+#df <- data.frame(df)
+#df[,57:85] <- (df[,57:85] / df[,34])*100 # Land cover data base
+#df[,86:97] <- (df[,86:97] / df[,34])*100 # Top rock SI database
 
 ```
 
 Make rownames of dataframe UID and add TICI values to sampledata dataframe df.
 
 ```{r df_rownames}
+df <- data.frame(df)
 row.names(df) <- df$UID
 TICI <- data.frame(TICI)
 row.names(TICI) <- TICI$UID
 
 df <- merge(df, TICI[,3:7], by='row.names', all=TRUE)
 df$Row.names <- NULL
-colnames(df)[6] <- "X.SampleID"
+colnames(df)[8] <- "X.SampleID"
 df <- relocate(df, "X.SampleID")
 row.names(df) <- df$X.SampleID
 ```
@@ -249,32 +250,55 @@ protozoa <- subset_taxa(physeq,
 crustacea <- subset_taxa(physeq,
                          class=="Branchiopoda" | class=="Ostracoda" | class=="Malacostraca" | class=="Hexanauplia")
 
+insect <- subset_taxa(physeq,
+                         order=="Plecoptera" | genus=="Sigara" | order=="Trichoptera" | family=="Chironomidae" |
+                        family == "Simuliidae" | family == "Ceratopogonidae" | family=="Culicidae" | family=="Psychodidae" |
+                        family=="Limoniidae" | family == "Ephydridae" | family=="Lonchopteridae" | genus=="Lonchoptera" |
+                        genus=="Eristalis" | order=="Megaloptera" | order=="Ephemeroptera" | order=="Odonata")
+
 taxa.rich.table <- data.frame(rbind(
-  c("Bacteria", ntaxa(tax_glom(subset_taxa(physeq, superkingdom == "Bacteria"), "family")), ntaxa(tax_glom(subset_taxa(physeq, superkingdom == "Bacteria"), "genus"))),
-  c("Fungi", ntaxa(tax_glom(subset_taxa(physeq, kingdom == "Fungi"), "family")), ntaxa(tax_glom(subset_taxa(physeq, kingdom == "Fungi"), "genus"))),
-  c("Chlorphyta", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Chlorophyta"), "family")), ntaxa(tax_glom(subset_taxa(physeq, phylum == "Chlorophyta"), "genus"))),
-  c("Fungi", ntaxa(tax_glom(subset_taxa(physeq, kingdom == "Fungi"), "family")), ntaxa(tax_glom(subset_taxa(physeq, kingdom == "Fungi"), "genus"))),
+  c("Bacteria", ntaxa(tax_glom(subset_taxa(physeq, superkingdom == "Bacteria"), "family")),
+    ntaxa(tax_glom(subset_taxa(physeq, superkingdom == "Bacteria"), "genus"))),
+  c("Fungi", ntaxa(tax_glom(subset_taxa(physeq, kingdom == "Fungi"), "family")),
+    ntaxa(tax_glom(subset_taxa(physeq, kingdom == "Fungi"), "genus"))),
+  c("Chlorphyta", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Chlorophyta"), "family")),
+    ntaxa(tax_glom(subset_taxa(physeq, phylum == "Chlorophyta"), "genus"))),
   c("Protists", ntaxa(tax_glom(protozoa, "family")), ntaxa(tax_glom(protozoa, "genus"))),
-  c("Diatoms", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Bacillariophyta"), "family")), ntaxa(tax_glom(subset_taxa(physeq, phylum == "Bacillariophyta"), "genus"))),
-  c("Plants", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Streptophyta"), "family")), ntaxa(tax_glom(subset_taxa(physeq, phylum == "Streptophyta"), "genus"))),
-  c("Rotifer", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Rotifera"), "family")), ntaxa(tax_glom(subset_taxa(physeq, phylum == "Rotifera"), "genus"))),
-  c("Tardigrade", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Tardigrada"), "family")), ntaxa(tax_glom(subset_taxa(physeq, phylum == "Tardigrada"), "genus"))),
-  c("Porifera", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Porifera"), "family")), ntaxa(tax_glom(subset_taxa(physeq, phylum == "Porifera"), "genus"))),
-  c("Cnidaria", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Cnidaria"), "family")), ntaxa(tax_glom(subset_taxa(physeq, phylum == "Cnidaria"), "genus"))),
-  c("Gastrotricha", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Gastrotricha"), "family")), ntaxa(tax_glom(subset_taxa(physeq, phylum == "Gastrotricha"), "genus"))),
-  c("Platyhelminthes", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Platyhelminthes"), "family")), ntaxa(tax_glom(subset_taxa(physeq, phylum == "Platyhelminthes"), "genus"))),
-  c("Nemertea", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Nemertea"), "family")), ntaxa(tax_glom(subset_taxa(physeq, phylum == "Nemertea"), "genus"))),
-  c("Nematoda", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Nematoda"), "family")), ntaxa(tax_glom(subset_taxa(physeq, phylum == "Nematoda"), "genus"))),
-  c("Annelida", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Annelida"), "family")), ntaxa(tax_glom(subset_taxa(physeq, phylum == "Annelida"), "genus"))),
-  c("Mollusca", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Mollusca"), "family")), ntaxa(tax_glom(subset_taxa(physeq, phylum == "Mollusca"), "genus"))),
+  c("Diatoms", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Bacillariophyta"), "family")),
+    ntaxa(tax_glom(subset_taxa(physeq, phylum == "Bacillariophyta"), "genus"))),
+  c("Plants", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Streptophyta"), "family")),
+    ntaxa(tax_glom(subset_taxa(physeq, phylum == "Streptophyta"), "genus"))),
+  c("Rotifer", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Rotifera"), "family")),
+    ntaxa(tax_glom(subset_taxa(physeq, phylum == "Rotifera"), "genus"))),
+  c("Tardigrade", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Tardigrada"), "family")),
+    ntaxa(tax_glom(subset_taxa(physeq, phylum == "Tardigrada"), "genus"))),
+  c("Porifera", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Porifera"), "family")),
+    ntaxa(tax_glom(subset_taxa(physeq, phylum == "Porifera"), "genus"))),
+  c("Cnidaria", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Cnidaria"), "family")),
+    ntaxa(tax_glom(subset_taxa(physeq, phylum == "Cnidaria"), "genus"))),
+  c("Gastrotricha", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Gastrotricha"), "family")),
+    ntaxa(tax_glom(subset_taxa(physeq, phylum == "Gastrotricha"), "genus"))),
+  c("Platyhelminthes", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Platyhelminthes"), "family")),
+    ntaxa(tax_glom(subset_taxa(physeq, phylum == "Platyhelminthes"), "genus"))),
+  c("Nemertea", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Nemertea"), "family")),
+    ntaxa(tax_glom(subset_taxa(physeq, phylum == "Nemertea"), "genus"))),
+  c("Nematoda", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Nematoda"), "family")),
+    ntaxa(tax_glom(subset_taxa(physeq, phylum == "Nematoda"), "genus"))),
+  c("Annelida", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Annelida"), "family")),
+    ntaxa(tax_glom(subset_taxa(physeq, phylum == "Annelida"), "genus"))),
+  c("Mollusca", ntaxa(tax_glom(subset_taxa(physeq, phylum == "Mollusca"), "family")),
+    ntaxa(tax_glom(subset_taxa(physeq, phylum == "Mollusca"), "genus"))),
   c("Crustacea", ntaxa(tax_glom(crustacea, "family")), ntaxa(tax_glom(crustacea, "genus"))),
-  c("Insects", ntaxa(tax_glom(subset_taxa(physeq, class == "Insecta"), "family")), ntaxa(tax_glom(subset_taxa(physeq, class == "Insecta"), "genus"))),
-  c("Fish", ntaxa(tax_glom(subset_taxa(physeq, class == "Actinopteri" | class=="Hyperoartia"), "family")), ntaxa(tax_glom(subset_taxa(physeq, class == "Actinopteri" | class=="Hyperoartia"), "genus"))),
-  c("Birds", ntaxa(tax_glom(subset_taxa(physeq, class == "Aves"), "family")), ntaxa(tax_glom(subset_taxa(physeq, class == "Aves"), "genus")))
+  c("Insecta", ntaxa(tax_glom(insect, "family")), ntaxa(tax_glom(insect, "genus"))),
+  c("Fish", ntaxa(tax_glom(subset_taxa(physeq, class == "Actinopteri" | class=="Hyperoartia"), "family")),
+    ntaxa(tax_glom(subset_taxa(physeq, class == "Actinopteri" | class=="Hyperoartia"), "genus"))),
+  c("Birds", ntaxa(tax_glom(subset_taxa(physeq, class == "Aves"), "family")),
+    ntaxa(tax_glom(subset_taxa(physeq, class == "Aves"), "genus")))
 ))
 
 colnames(taxa.rich.table) <- c("Taxa", "Family", "Genus")
 
+taxa.rich.table
 ```
 
 # Superkingdom: Bacteria
@@ -357,7 +381,7 @@ PCoA of entire bacterial dataset. Probably best to do at a site level to have an
 bac.ord <- ordinate(bac, "PCoA", "bray")
 p1 = plot_ordination(bac, bac.ord, type="taxa", color="phylum", title="Bacterial phyla")
 p1
-p2 = plot_ordination(bac, bac.ord, type="samples", color="Site") 
+p2 = plot_ordination(bac, bac.ord, type="samples", color="GEOLOGY") 
 p2 + geom_polygon(aes(fill=Site)) + geom_point(size=5) + ggtitle("samples")
 p2
 ```
